@@ -112,7 +112,7 @@ int main()
     }
 
     // Message to send
-    std::string message = "Hello World";
+    std::string message = "hELLO WORLD";
     DWORD bytesWritten;
 
     // Send the message
