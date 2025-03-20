@@ -46,9 +46,21 @@ int rev = 0;
 int x = 0;
 int y = 0;
 int z = 0;
+uint8_t xarray[] = {0, 0, 0};
+uint8_t yarray[] = {0, 0, 0};
+uint8_t zarray[] = {0, 0, 0};
+int FACE_DETECTION_FLAG = 0;
+int xidx = 0;
+int yidx = 0;
+int zidx = 0;
+char xval = 0;
+char yval = 0;
+char zval = 0;
+int cartesiancount = 0; //0 corresponds to x, 1 corresponds to y, 2 corresponds to z.
 
 
 void setup() {
+  pinMode(2, OUTPUT);
   Serial.begin(9600);
   Serial.println("8 channel Servo test!");
 
@@ -77,34 +89,54 @@ void setup() {
 
 // You can use this function if you'd like to set the pulse length in seconds
 // e.g. setServoPulse(0, 0.001) is a ~1 millisecond pulse width. It's not precise!
-void setServoPulse(uint8_t n, double pulse) {
-  double pulselength;
-  
-  pulselength = 1000000;   // 1,000,000 us per second
-  pulselength /= SERVO_FREQ;   // Analog servos run at ~60 Hz updates
-  Serial.print(pulselength); Serial.println(" us per period"); 
-  pulselength /= 4096;  // 12 bits of resolution
-  Serial.print(pulselength); Serial.println(" us per bit"); 
-  pulse *= 1000000;  // convert input seconds to us
-  pulse /= pulselength;
-  Serial.println(pulse);
-  pwm.setPWM(n, 0, pulse);
-}
 
 void loop() {
 
-while (serial.availible() > 0)
-{
-  
-  x = serial.read();
-  y
+  while(1){
+    if(Serial.available() > 0)
+    {
+      Serial.read();
+      digitalWrite(2 , 1);
+      delay(100);
+      digitalWrite(2 , 0);
+      delay(100);
+    }
 
-}
+  }
+
+
+  while (Serial.available() > 0)
+  {
+
+    if(FACE_DETECTION_FLAG == 0)
+    {
+      if (Serial.read() == '(')
+      {FACE_DETECTION_FLAG = 1;}
+    }
+
+    if(FACE_DETECTION_FLAG == 1)
+    {
+      while (cartesiancount == 0)
+      {
+        xval = Serial.read();
+        if (xval != ',')
+        {
+          xarray[xidx] = xval;
+          xidx++;
+        }
+      
+      }
+      
+    }
+    //x = serial.read();
+    
+
+  }
 
 
 
   // Drive each servo one at a time using setPWM()
-  Serial.println(servonum);
+  //Serial.println(servonum);
   for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) {
     pwm.setPWM(servonum, 0, pulselen); //command that moves the servo
   }
@@ -141,3 +173,20 @@ while (serial.availible() > 0)
   servonum++;
   if (servonum > 7) servonum = 0; // Testing the first 8 servo channels
 }
+
+
+
+void setServoPulse(uint8_t n, double pulse) {
+  double pulselength;
+  
+  pulselength = 1000000;   // 1,000,000 us per second
+  pulselength /= SERVO_FREQ;   // Analog servos run at ~60 Hz updates
+  Serial.print(pulselength); Serial.println(" us per period"); 
+  pulselength /= 4096;  // 12 bits of resolution
+  Serial.print(pulselength); Serial.println(" us per bit"); 
+  pulse *= 1000000;  // convert input seconds to us
+  pulse /= pulselength;
+  Serial.println(pulse);
+  pwm.setPWM(n, 0, pulse);
+}
+
