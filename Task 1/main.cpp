@@ -58,9 +58,9 @@ int main()
             float y = ((faces.front().y+faces.front().size().height/2-frame.size().height/2)*z)/500.0f;
             cout<<"("<<x<<", "<<y<<", "<<z<<")"<<endl;*/
 
-            int z = 10000.0f/faces.front().width;
-            int x = ((faces.front().x+faces.front().size().width /2-frame.size().width /2)*z)/500.0f;
-            int y = ((faces.front().y+faces.front().size().height/2-frame.size().height/2)*z)/500.0f;
+            signed int z = 10000.0f/faces.front().width;
+            signed int x = ((faces.front().x+faces.front().size().width /2-frame.size().width /2)*z)/500.0f;
+            signed int y = -1*((faces.front().y+faces.front().size().height/2-frame.size().height/2)*z)/500.0f;
             cout<<"("<<x<<", "<<y<<", "<<z<<")"<<endl;
         }
 
