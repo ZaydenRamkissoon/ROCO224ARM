@@ -1,197 +1,172 @@
-/*************************************************** 
-  This is an example for our Adafruit 16-channel PWM & Servo driver
-  Servo test - this will drive 8 servos, one after the other on the
-  first 8 pins of the PCA9685
-
-  Pick one up today in the adafruit shop!
-  ------> http://www.adafruit.com/products/815
-  
-  These drivers use I2C to communicate, 2 pins are required to  
-  interface.
-
-  Adafruit invests time and resources providing this open source code, 
-  please support Adafruit and open-source hardware by purchasing 
-  products from Adafruit!
-
-  Written by Limor Fried/Ladyada for Adafruit Industries.  
-  BSD license, all text above must be included in any redistribution
- ****************************************************/
-
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
 
-// called this way, it uses the default address 0x40
+// Using the default address 0x40 for the PWM driver
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
-// you can also call it with a different address you want
-//Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
-// you can also call it with a different address and I2C interface
-//Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40, Wire);
 
-// Depending on your servo make, the pulse width min and max may vary, you 
-// want these to be as small/large as possible without hitting the hard stop
-// for max range. You'll have to tweak them as necessary to match the servos you
-// have!
-#define SERVOMIN  150 // This is the 'minimum' pulse length count (out of 4096)
-#define SERVOMAX  600 // This is the 'maximum' pulse length count (out of 4096)
-#define USMIN  600 // This is the rounded 'minimum' microsecond length based on the minimum pulse of 150
-#define USMAX  2400 // This is the rounded 'maximum' microsecond length based on the maximum pulse of 600
-#define SERVO_FREQ 50 // Analog servos run at ~50 Hz updates
+// Servo constants
+#define SERVO_FREQ 50    // Analog servos run at ~50 Hz updates
+#define SG90MIN 150      // Minimum pulse length for SG90 servos
+#define SG90MAX 500      // Maximum pulse length for SG90 servos
 
-#define SG90MIN 0
-#define SG90MAX 500
+// Define servo pins
+#define SERVO_X 0        // X-axis servo channel
+#define SERVO_Y 1        // Y-axis servo channel
+#define SERVO_Z 2        // Z-axis servo channel
 
-// our servo # counter
-uint8_t servonum = 0;
-int rev = 0;
-int x = 0;
-int y = 0;
-int z = 0;
-uint8_t xarray[] = {0, 0, 0};
-uint8_t yarray[] = {0, 0, 0};
-uint8_t zarray[] = {0, 0, 0};
-int FACE_DETECTION_FLAG = 0;
-int xidx = 0;
-int yidx = 0;
-int zidx = 0;
-char xval = 0;
-char yval = 0;
-char zval = 0;
-int cartesiancount = 0; //0 corresponds to x, 1 corresponds to y, 2 corresponds to z.
-float gear1 = 1;
-float gear2 = 1;
-float gear3 = 1;
-float gear4 = 1;
+// Variables for face coordinates
+int faceX = 0;
+int faceY = 0;
+int faceZ = 0;
+bool faceDetected = false;
 
+// Buffer for incoming data
+const int BUFFER_SIZE = 16;
+char buffer[BUFFER_SIZE];
+int bufferIndex = 0;
+
+// Debug buffer
+char debugBuf[64];
+
+// LED pins for debugging
+const int ledPin = 13;
+const int ledX = 5;  // LED for X coordinate
+const int ledY = 6;  // LED for Y coordinate
+const int ledZ = 7;  // LED for Z coordinate
 
 void setup() {
-  pinMode(2, OUTPUT);
+  // Initialize main serial communication at 9600 baud
   Serial.begin(9600);
-  Serial.println("8 channel Servo test!");
-
+ 
+  // Set up the LED pins
+  pinMode(ledPin, OUTPUT);
+  pinMode(ledX, OUTPUT);
+  pinMode(ledY, OUTPUT);
+  pinMode(ledZ, OUTPUT);
+ 
+  // Initialize PWM servo driver
   pwm.begin();
-  /*
-   * In theory the internal oscillator (clock) is 25MHz but it really isn't
-   * that precise. You can 'calibrate' this by tweaking this number until
-   * you get the PWM update frequency you're expecting!
-   * The int.osc. for the PCA9685 chip is a range between about 23-27MHz and
-   * is used for calculating things like writeMicroseconds()
-   * Analog servos run at ~50 Hz updates, It is importaint to use an
-   * oscilloscope in setting the int.osc frequency for the I2C PCA9685 chip.
-   * 1) Attach the oscilloscope to one of the PWM signal pins and ground on
-   *    the I2C PCA9685 chip you are setting the value for.
-   * 2) Adjust setOscillatorFrequency() until the PWM update frequency is the
-   *    expected value (50Hz for most ESCs)
-   * Setting the value here is specific to each individual I2C PCA9685 chip and
-   * affects the calculations for the PWM update frequency. 
-   * Failure to correctly set the int.osc value will cause unexpected PWM results
-   */
   pwm.setOscillatorFrequency(27000000);
-  pwm.setPWMFreq(SERVO_FREQ);  // Analog servos run at ~50 Hz updates
-
-  delay(10);
+  pwm.setPWMFreq(SERVO_FREQ);
+ 
+  // Center the servos initially
+  moveServo(SERVO_X, 325); // Center X
+  moveServo(SERVO_Y, 325); // Center Y
+  moveServo(SERVO_Z, 325); // Center Z
+ 
+  // Visual indication that system is ready
+  for(int i = 0; i < 3; i++) {
+    digitalWrite(ledPin, HIGH);
+    delay(100);
+    digitalWrite(ledPin, LOW);
+    delay(100);
+  }
+ 
+  delay(1000);
 }
-
-// You can use this function if you'd like to set the pulse length in seconds
-// e.g. setServoPulse(0, 0.001) is a ~1 millisecond pulse width. It's not precise!
 
 void loop() {
-
-  while(1)
-  {
-    if(Serial.available() > 0)
-    {
-      Serial.read();
-      digitalWrite(2 , 1);
-      delay(100);
-      digitalWrite(2 , 0);
-      delay(100);
-    }
-    //break;
+  // Check if data is available from serial
+  while (Serial.available() > 0) {
+    // Read the incoming byte
+    char incomingByte = Serial.read();
+   
+    // Blink LED to indicate data received
+    digitalWrite(ledPin, HIGH);
+    delay(10);
+    digitalWrite(ledPin, LOW);
+   
+    // Process the received data
+    processIncomingByte(incomingByte);
   }
-
-
-  while (Serial.available() > 0)
-  {
-
-    if(FACE_DETECTION_FLAG == 0)
-    {
-      if (Serial.read() == '(')
-      {FACE_DETECTION_FLAG = 1;}
-    }
-
-    if(FACE_DETECTION_FLAG == 1)
-    {
-      while (cartesiancount == 0)
-      {
-        xval = Serial.read();
-        if (xval != ',')
-        {
-          xarray[xidx] = xval;
-          xidx++;
-        }
-      
-      }
-      
-    }
-    //x = serial.read();
-    
-    break;
+ 
+  // If face coordinates are received, move servos accordingly
+  if (faceDetected) {
+    // Visual indication of face coordinates using LEDs
+    // The brightness of each LED corresponds to the coordinate value
+    analogWrite(ledX, map(faceX, 0, 999, 0, 255));
+    analogWrite(ledY, map(faceY, 0, 999, 0, 255));
+    analogWrite(ledZ, map(faceZ, 0, 999, 0, 255));
+   
+    // Map face coordinates to servo positions
+    int servoX = mapCoordToServo(faceX);
+    int servoY = mapCoordToServo(faceY);
+    int servoZ = mapCoordToServo(faceZ);
+   
+    // Move servos to track the face
+    moveServo(SERVO_X, servoX);
+    moveServo(SERVO_Y, servoY);
+    moveServo(SERVO_Z, servoZ);
+   
+    // Reset the face detected flag
+    faceDetected = false;
   }
-
-
-
-  // Drive each servo one at a time using setPWM()
-  //Serial.println(servonum);
-  for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) {
-    pwm.setPWM(servonum, 0, pulselen); //command that moves the servo
-  }
-
-  /*while (rev<3)
-  {
-    for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen--) {
-    pwm.setPWM(servonum, 0, pulselen); //command that moves the servo
-  }
-    //pwm.setPWM(servonum, 0, pulselen);
-    //check if rev =3;
-  }*/
-
-  delay(500);
-  for (uint16_t pulselen = SG90MAX; pulselen > SG90MIN; pulselen--) {
-    pwm.setPWM(servonum, 0, pulselen);
-  }
-
-  delay(500);
-  /*
-  // Drive each servo one at a time using writeMicroseconds(), it's not precise due to calculation rounding!
-  // The writeMicroseconds() function is used to mimic the Arduino Servo library writeMicroseconds() behavior. 
-  for (uint16_t microsec = USMIN; microsec < USMAX; microsec++) {
-    pwm.writeMicroseconds(servonum, microsec);
-  }
-
-  delay(500);
-  for (uint16_t microsec = USMAX; microsec > USMIN; microsec--) {
-    pwm.writeMicroseconds(servonum, microsec);
-  }*/
-
-  delay(500);
-
-  servonum++;
-  if (servonum > 7) servonum = 0; // Testing the first 8 servo channels
+ 
+  delay(10); // Small delay to prevent overwhelming the serial buffer
 }
 
-
-
-void setServoPulse(uint8_t n, double pulse) {
-  double pulselength;
-  
-  pulselength = 1000000;   // 1,000,000 us per second
-  pulselength /= SERVO_FREQ;   // Analog servos run at ~60 Hz updates
-  Serial.print(pulselength); Serial.println(" us per period"); 
-  pulselength /= 4096;  // 12 bits of resolution
-  Serial.print(pulselength); Serial.println(" us per bit"); 
-  pulse *= 1000000;  // convert input seconds to us
-  pulse /= pulselength;
-  Serial.println(pulse);
-  pwm.setPWM(n, 0, pulse);
+// Process each incoming byte
+void processIncomingByte(char inByte) {
+  // Check if this is the start of coordinates
+  if (inByte == '(') {
+    bufferIndex = 0;
+    buffer[bufferIndex++] = inByte;
+  }
+  // Add the incoming byte to the buffer
+  else if (bufferIndex < BUFFER_SIZE - 1 && bufferIndex > 0) {
+    buffer[bufferIndex++] = inByte;
+   
+    // Check if we have a complete message (ending with ')')
+    if (inByte == ')') {
+      // Null-terminate the string
+      buffer[bufferIndex] = '\0';
+     
+      // Parse the coordinates
+      parseCoordinates(buffer);
+     
+      // Reset the buffer index for the next message
+      bufferIndex = 0;
+    }
+  }
 }
 
+// Parse the received coordinates in format "(x,y,z)"
+void parseCoordinates(char* data) {
+  // Check if the data starts with '(' and ends with ')'
+  if (data[0] == '(' && data[bufferIndex-1] == ')') {
+    // Format should be "(xxx,yyy,zzz)"
+    char xStr[4] = {data[1], data[2], data[3], '\0'};
+    char yStr[4] = {data[5], data[6], data[7], '\0'};
+    char zStr[4] = {data[9], data[10], data[11], '\0'};
+   
+    // Convert strings to integers
+    faceX = atoi(xStr);
+    faceY = atoi(yStr);
+    faceZ = atoi(zStr);
+    faceDetected = true;
+  }
+}
+
+// Map face coordinates to servo positions
+int mapCoordToServo(int position) {
+  // Map the position from 0-999 to servo range
+  return map(position, 0, 999, SG90MIN, SG90MAX);
+}
+
+// Move a servo to a specific position
+void moveServo(uint8_t servoNum, uint16_t position) {
+  // Ensure position is within bounds
+  position = constrain(position, SG90MIN, SG90MAX);
+ 
+  // Set the servo position
+  pwm.setPWM(servoNum, 0, position);
+}
+
+// If you want to add printf-like debugging later,
+// you can connect a second Arduino and use this function:
+/*
+void debugPrint(const char* format, ...) {
+  // This function is commented out but can be implemented
+  // if you add a second Arduino for debugging
+}
+*/
