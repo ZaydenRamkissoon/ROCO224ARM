@@ -57,6 +57,10 @@ char xval = 0;
 char yval = 0;
 char zval = 0;
 int cartesiancount = 0; //0 corresponds to x, 1 corresponds to y, 2 corresponds to z.
+float gear1 = 1;
+float gear2 = 1;
+float gear3 = 1;
+float gear4 = 1;
 
 
 void setup() {
@@ -92,7 +96,8 @@ void setup() {
 
 void loop() {
 
-  while(1){
+  while(1)
+  {
     if(Serial.available() > 0)
     {
       Serial.read();
@@ -101,7 +106,7 @@ void loop() {
       digitalWrite(2 , 0);
       delay(100);
     }
-
+    //break;
   }
 
 
@@ -130,7 +135,7 @@ void loop() {
     }
     //x = serial.read();
     
-
+    break;
   }
 
 
