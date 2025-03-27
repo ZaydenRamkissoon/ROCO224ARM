@@ -1,5 +1,6 @@
 #include <WiFi.h>
 #include <WebServer.h>
+#include <HardwareSerial.h>
 
 // Access point credentials
 const char* ssid = "ESP32-AP";  // Name of your access point
@@ -7,6 +8,15 @@ const char* password = "12345678";  // Password (must be at least 8 characters)
 
 // Web server on port 80
 WebServer server(80);
+
+// Define the hardware serial ports for monitoring
+// Serial0 is used for programming/debugging (USB) - this is COM16 at 115200 baud
+// We'll use Serial2 for connecting to COM8 at 9600 baud
+HardwareSerial SerialCOM8(2); // Using UART2
+
+// Pins for the second serial connection (can be adjusted based on your wiring)
+#define RX2_PIN 16  // GPIO16 as RX for second serial
+#define TX2_PIN 17  // GPIO17 as TX for second serial
 
 // Buffer to store serial output
 #define MAX_LOG_ENTRIES 100
@@ -25,9 +35,12 @@ char buffer[16];
 int bufferIndex = 0;
 
 void setup() {
-  // Start serial communication
-  Serial.begin(115200);
-  Serial.println("\nESP32 Face Coordinates Monitor");
+  // Start main serial communication (USB/COM16)
+  Serial.begin(115200);  // Set to 115200 to match COM16 baud rate
+  Serial.println("\nESP32 Dual Serial Monitor");
+  
+  // Start second serial port for COM8 (RX2, TX2 pins)
+  SerialCOM8.begin(9600, SERIAL_8N1, RX2_PIN, TX2_PIN);
   
   // Configure ESP32 as an access point
   WiFi.softAP(ssid, password);
@@ -50,7 +63,9 @@ void setup() {
   Serial.println("Then visit http://192.168.4.1 in your browser");
   
   // Add initial logs
-  addToSerialLog("ESP32 Face Coordinates Monitor started");
+  addToSerialLog("ESP32 Dual Serial Monitor started");
+  addToSerialLog("Main Serial (COM16): 115200 baud");
+  addToSerialLog("COM8 Serial: 9600 baud on pins RX:" + String(RX2_PIN) + ", TX:" + String(TX2_PIN));
   addToSerialLog("Access Point IP: " + IP.toString());
 }
 
@@ -63,54 +78,74 @@ void loop() {
   if (currentMillis - lastSerialCheck > 100) {  // Check every 100ms
     lastSerialCheck = currentMillis;
     
-    // Read from serial
-    while (Serial.available() > 0) {
-      char inChar = Serial.read();
+    // Read from main serial (USB/COM16)
+    checkSerial(Serial, "COM16");
+    
+    // Read from COM8 serial
+    checkSerial(SerialCOM8, "COM8");
+  }
+}
+
+// Check a serial port for data
+void checkSerial(Stream &serial, String portName) {
+  while (serial.available() > 0) {
+    char inChar = serial.read();
+    
+    // Process for face coordinates
+    if (processSerialByte(inChar, portName)) {
+      // If a full coordinate was processed, don't add to raw log
+      continue;
+    }
+    
+    // Add raw serial data to logs if it's a printable character or newline
+    if ((inChar >= 32 && inChar <= 126) || inChar == '\n' || inChar == '\r') {
+      static String currentLine = "";
       
-      // Process for face coordinates
-      processSerialByte(inChar);
-      
-      // Also add raw serial data to logs
-      if (inChar == '\n') {
-        String line = "";
-        for (int i = 0; i < bufferIndex && i < 15; i++) {
-          line += buffer[i];
+      if (inChar == '\n' || inChar == '\r') {
+        if (currentLine.length() > 0) {
+          addToSerialLog(portName + ": " + currentLine);
+          currentLine = "";
         }
-        if (line.length() > 0) {
-          addToSerialLog("Serial: " + line);
-        }
-        bufferIndex = 0;
-      } else if (bufferIndex < 15) {
-        buffer[bufferIndex++] = inChar;
+      } else {
+        currentLine += inChar;
       }
     }
   }
 }
 
 // Process incoming serial byte for coordinate detection
-void processSerialByte(char inChar) {
+// Returns true if a complete coordinate was processed
+bool processSerialByte(char inChar, String portName) {
   static char coordBuffer[16];
   static int coordIndex = 0;
+  static bool inCoordinate = false;
   
   // Start of coordinate packet
   if (inChar == '(') {
     coordIndex = 0;
     coordBuffer[coordIndex++] = inChar;
+    inCoordinate = true;
+    return true;
   }
   // Add character to buffer
-  else if (coordIndex > 0 && coordIndex < 15) {
+  else if (inCoordinate && coordIndex > 0 && coordIndex < 15) {
     coordBuffer[coordIndex++] = inChar;
     
     // Check if we have complete coordinates
     if (inChar == ')') {
       coordBuffer[coordIndex] = '\0'; // Null terminate
-      parseCoordinates(coordBuffer, coordIndex);
+      parseCoordinates(coordBuffer, coordIndex, portName);
+      inCoordinate = false;
+      return true;
     }
+    return true;
   }
+  
+  return false;
 }
 
 // Parse coordinates from buffer in format "(xxx,yyy,zzz)"
-void parseCoordinates(char* data, int length) {
+void parseCoordinates(char* data, int length, String portName) {
   // Check if the data format is correct
   if (data[0] == '(' && data[length-1] == ')') {
     // Format should be "(xxx,yyy,zzz)"
@@ -153,7 +188,8 @@ void parseCoordinates(char* data, int length) {
       faceDetected = true;
       
       // Log the coordinates
-      String coordMsg = "Face detected at X:" + String(x) + ", Y:" + String(y) + ", Z:" + String(z);
+      String coordData = String(data);
+      String coordMsg = "Face detected from " + portName + ": " + coordData + " (X:" + String(x) + ", Y:" + String(y) + ", Z:" + String(z) + ")";
       addToSerialLog(coordMsg);
     }
   }
@@ -176,6 +212,7 @@ void handleRoot() {
   html += "<html>";
   html += "<head>";
   html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<meta http-equiv='refresh' content='300'>";  // Refresh page every 5 minutes to prevent stale
   html += "<title>ESP32 Face Coordinates Monitor</title>";
   html += "<style>";
   html += "body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }";
@@ -192,6 +229,7 @@ void handleRoot() {
   html += ".face-status { font-weight: bold; }";
   html += ".face-detected { color: green; }";
   html += ".face-not-detected { color: red; }";
+  html += ".source-note { font-size: 12px; color: #666; font-style: italic; margin-top: 5px; }";
   html += "</style>";
   html += "<script>";
   html += "function updateLogs() {";
@@ -251,6 +289,7 @@ void handleRoot() {
   html += "<div class='label'>Z-Coordinate</div>";
   html += "</div>";
   html += "<div class='status'>Face Status: <span id='face-status' class='face-status " + String(faceDetected ? "face-detected" : "face-not-detected") + "'>" + String(faceDetected ? "DETECTED" : "NOT DETECTED") + "</span></div>";
+  html += "<div class='source-note'>Monitoring COM16 (115200 baud) and COM8 (9600 baud)</div>";
   html += "</div>";
   html += "<div class='controls'>";
   html += "<button onclick='updateLogs()'>Refresh Logs</button>";
@@ -276,11 +315,11 @@ void handleLogs() {
   for (int i = 0; i < MAX_LOG_ENTRIES; i++) {
     int idx = (startIndex + i) % MAX_LOG_ENTRIES;
     if (serialLogs[idx].length() > 0) {
-      logs += serialLogs[idx] + "\n";
+      logs += serialLogs[idx] + "<br>";
     }
   }
   
-  server.send(200, "text/plain", logs);
+  server.send(200, "text/html", logs);
 }
 
 // Handle clear request

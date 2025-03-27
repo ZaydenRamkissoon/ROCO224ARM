@@ -129,7 +129,7 @@ int main()
 
             // Prepare the message to send
             char buffer[16];
-            sprintf(buffer, "(%3.0f,%3.0f,%3.0f)", x, y, z);
+            sprintf(buffer, "(%3d,%3d,%3d)", x, y, z);
 
             // Send the coordinates over the serial port
             DWORD bytesWritten;
