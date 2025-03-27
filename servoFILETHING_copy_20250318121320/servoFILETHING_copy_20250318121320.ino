@@ -1,142 +1,108 @@
-/***************************************************
-  This is an example for our Adafruit 16-channel PWM & Servo driver
-  Servo test - this will drive 8 servos, one after the other on the
-  first 8 pins of the PCA9685
-
-  Pick one up today in the adafruit shop!
-  ------> http://www.adafruit.com/products/815
- 
-  These drivers use I2C to communicate, 2 pins are required to  
-  interface.
-
-  Adafruit invests time and resources providing this open source code,
-  please support Adafruit and open-source hardware by purchasing
-  products from Adafruit!
-
-  Written by Limor Fried/Ladyada for Adafruit Industries.  
-  BSD license, all text above must be included in any redistribution
- ****************************************************/
-
+#include <WiFi.h>
+#include <WebServer.h>
+#include <HardwareSerial.h>
 #include <Wire.h>
 #include <Adafruit_PWMServoDriver.h>
 
-// called this way, it uses the default address 0x40
+// Access point credentials
+const char* ssid = "ESP32-FaceTracker";
+const char* password = "12345678";
+
+// Web server on port 80
+WebServer server(80);
+
+// Servo driver
 Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
-// you can also call it with a different address you want
-//Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x41);
-// you can also call it with a different address and I2C interface
-//Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver(0x40, Wire);
 
-// Depending on your servo make, the pulse width min and max may vary, you
-// want these to be as small/large as possible without hitting the hard stop
-// for max range. You'll have to tweak them as necessary to match the servos you
-// have!
-#define SERVOMIN  150 // This is the 'minimum' pulse length count (out of 4096)
-#define SERVOMAX  600 // This is the 'maximum' pulse length count (out of 4096)
-#define USMIN  600 // This is the rounded 'minimum' microsecond length based on the minimum pulse of 150
-#define USMAX  2400 // This is the rounded 'maximum' microsecond length based on the maximum pulse of 600
+// Servo configuration
+#define SERVOMIN  150 // Minimum pulse length count
+#define SERVOMAX  600 // Maximum pulse length count
 #define SERVO_FREQ 50 // Analog servos run at ~50 Hz updates
-
 #define SG90MIN 0
 #define SG90MAX 500
 
-// our servo # counter
-uint8_t servonum = 0;
-int rev = 0;
+// Define serial port for COM8 monitoring
+HardwareSerial SerialCOM8(2); // Using UART2
+
+// Pins for COM8 serial connection
+#define RX2_PIN 16  // GPIO16 as RX for COM8
+#define TX2_PIN 17  // GPIO17 as TX for COM8
+
+// Logging configuration
+#define MAX_LOG_ENTRIES 50
+String serialLogs[MAX_LOG_ENTRIES];
+int logIndex = 0;
+
+// Face coordinates
 int x = 0;
 int y = 0;
 int z = 0;
-uint8_t xarray[] = {0, 0, 0};
-uint8_t yarray[] = {0, 0, 0};
-uint8_t zarray[] = {0, 0, 0};
-int FACE_DETECTION_FLAG = 0;
-int xidx = 0;
-int yidx = 0;
-int zidx = 0;
-char xval = 0;
-char yval = 0;
-char zval = 0;
-int cartesiancount = 0; //0 corresponds to x, 1 corresponds to y, 2 corresponds to z.
-float gear1 = 1;
-float gear2 = 1;
-float gear3 = 1;
-float gear4 = 1;
+bool faceDetected = false;
 
-// New variables for improved face detection
+// Buffer for receiving coordinates
 char buffer[16];
 int bufferIndex = 0;
-bool newDataAvailable = false;
 
 void setup() {
-  pinMode(2, OUTPUT);
-  Serial.begin(9600);
-  Serial.println("8 channel Servo test!");
-
+  // Start debug serial on default UART at 115200 baud
+  Serial.begin(115200);
+  Serial.println("\nESP32 Face Tracking and Servo Control");
+  
+  // Initialize I2C and Servo Driver
+  Wire.begin();
   pwm.begin();
-  /*
-   * In theory the internal oscillator (clock) is 25MHz but it really isn't
-   * that precise. You can 'calibrate' this by tweaking this number until
-   * you get the PWM update frequency you're expecting!
-   * The int.osc. for the PCA9685 chip is a range between about 23-27MHz and
-   * is used for calculating things like writeMicroseconds()
-   * Analog servos run at ~50 Hz updates, It is importaint to use an
-   * oscilloscope in setting the int.osc frequency for the I2C PCA9685 chip.
-   * 1) Attach the oscilloscope to one of the PWM signal pins and ground on
-   *    the I2C PCA9685 chip you are setting the value for.
-   * 2) Adjust setOscillatorFrequency() until the PWM update frequency is the
-   *    expected value (50Hz for most ESCs)
-   * Setting the value here is specific to each individual I2C PCA9685 chip and
-   * affects the calculations for the PWM update frequency.
-   * Failure to correctly set the int.osc value will cause unexpected PWM results
-   */
   pwm.setOscillatorFrequency(27000000);
-  pwm.setPWMFreq(SERVO_FREQ);  // Analog servos run at ~50 Hz updates
-
-  delay(10);
+  pwm.setPWMFreq(SERVO_FREQ);
+  
+  // Start COM8 connection on UART2 at 9600 baud
+  SerialCOM8.begin(9600, SERIAL_8N1, RX2_PIN, TX2_PIN);
+  
+  // Configure ESP32 as an access point
+  WiFi.softAP(ssid, password);
+  
+  // Get IP address
+  IPAddress IP = WiFi.softAPIP();
+  Serial.print("Access Point IP address: ");
+  Serial.println(IP);
+  
+  // Define server routes
+  server.on("/", handleRoot);
+  server.on("/logs", handleLogs);
+  server.on("/coordinates", handleCoordinates);
+  
+  // Start the server
+  server.begin();
+  Serial.println("HTTP server started");
+  Serial.println("Connect to WiFi SSID: " + String(ssid) + " with password: " + String(password));
+  Serial.println("Then visit http://192.168.4.1 in your browser");
+  
+  // Add initial log
+  addToLog("ESP32 Face Tracking Monitor started");
+  addToLog("Listening on COM8 at 9600 baud (RX:" + String(RX2_PIN) + ", TX:" + String(TX2_PIN) + ")");
 }
-
-// You can use this function if you'd like to set the pulse length in seconds
-// e.g. setServoPulse(0, 0.001) is a ~1 millisecond pulse width. It's not precise!
 
 void loop() {
-  // Check for incoming data from facial recognition system
+  // Handle client requests
+  server.handleClient();
+  
+  // Check for data from COM8
   readFaceCoordinates();
- 
-  // If face coordinates received, move servos accordingly
-  if (newDataAvailable) {
+  
+  // Move servos if face is detected
+  if (faceDetected) {
     moveServosToFace();
-    newDataAvailable = false;
-  }
- 
-  // Original servo demo code (will run when no face data is available)
-  if (!Serial.available()) {
-    // Drive each servo one at a time using setPWM()
-    for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) {
-      pwm.setPWM(servonum, 0, pulselen); // command that moves the servo
-    }
-
-    delay(500);
-    for (uint16_t pulselen = SG90MAX; pulselen > SG90MIN; pulselen--) {
-      pwm.setPWM(servonum, 0, pulselen);
-    }
-
-    delay(500);
-
-    servonum++;
-    if (servonum > 7) servonum = 0; // Testing the first 8 servo channels
   }
 }
 
-// Read face coordinates from serial port
+// Read and process data from COM8
 void readFaceCoordinates() {
-  while (Serial.available() > 0) {
-    char inChar = Serial.read();
-   
-    // Blink LED to show data received
-    digitalWrite(2, HIGH);
-    delay(10);
-    digitalWrite(2, LOW);
-   
+  while (SerialCOM8.available() > 0) {
+    char inChar = SerialCOM8.read();
+    
+    // Echo to debug serial
+    Serial.write(inChar);
+    
+    // Process for face coordinates
     // Check if this is the start of a coordinate packet
     if (inChar == '(') {
       bufferIndex = 0;
@@ -145,13 +111,11 @@ void readFaceCoordinates() {
     // Add character to buffer
     else if (bufferIndex > 0 && bufferIndex < 15) {
       buffer[bufferIndex++] = inChar;
-     
+      
       // Check if we have complete coordinates
       if (inChar == ')') {
         buffer[bufferIndex] = '\0'; // Null terminate
         parseCoordinates();
-        newDataAvailable = true;
-        break;
       }
     }
   }
@@ -159,42 +123,67 @@ void readFaceCoordinates() {
 
 // Parse coordinates from buffer in format "(xxx,yyy,zzz)"
 void parseCoordinates() {
+  // Make a copy of the buffer for logging
+  String coordStr = String(buffer);
+  
   // Check if the data format is correct
   if (buffer[0] == '(' && buffer[bufferIndex-1] == ')') {
+    // Format should be "(xxx,yyy,zzz)"
+    char xStr[4] = {0};
+    char yStr[4] = {0};
+    char zStr[4] = {0};
+    
     // Extract X value (chars 1,2,3)
-    xidx = 0;
-    for (int i = 1; i <= 3; i++) {
+    int xIdx = 0;
+    for (int i = 1; i <= 3 && i < bufferIndex; i++) {
       if (buffer[i] >= '0' && buffer[i] <= '9') {
-        xarray[xidx++] = buffer[i];
+        xStr[xIdx++] = buffer[i];
       }
     }
-    xarray[xidx] = '\0';
-   
+    xStr[xIdx] = '\0';
+    
     // Extract Y value (chars 5,6,7)
-    yidx = 0;
-    for (int i = 5; i <= 7; i++) {
+    int yIdx = 0;
+    for (int i = 5; i <= 7 && i < bufferIndex; i++) {
       if (buffer[i] >= '0' && buffer[i] <= '9') {
-        yarray[yidx++] = buffer[i];
+        yStr[yIdx++] = buffer[i];
       }
     }
-    yarray[yidx] = '\0';
-   
+    yStr[yIdx] = '\0';
+    
     // Extract Z value (chars 9,10,11)
-    zidx = 0;
-    for (int i = 9; i <= 11; i++) {
+    int zIdx = 0;
+    for (int i = 9; i <= 11 && i < bufferIndex; i++) {
       if (buffer[i] >= '0' && buffer[i] <= '9') {
-        zarray[zidx++] = buffer[i];
+        zStr[zIdx++] = buffer[i];
       }
     }
-    zarray[zidx] = '\0';
-   
-    // Convert string arrays to integers
-    x = atoi((char*)xarray);
-    y = atoi((char*)yarray);
-    z = atoi((char*)zarray);
-   
-    FACE_DETECTION_FLAG = 1;
+    zStr[zIdx] = '\0';
+    
+    // Convert to integers
+    if (xIdx > 0 && yIdx > 0 && zIdx > 0) {
+      int newX = atoi(xStr);
+      int newY = atoi(yStr);
+      int newZ = atoi(zStr);
+      
+      // Only log and update if coordinates change
+      if (newX != x || newY != y || newZ != z || !faceDetected) {
+        x = newX;
+        y = newY;
+        z = newZ;
+        faceDetected = true;
+        
+        // Log the new coordinates
+        addToLog("Face at " + coordStr + " (X:" + String(x) + ", Y:" + String(y) + ", Z:" + String(z) + ")");
+      }
+    }
+  } else {
+    // Invalid format
+    addToLog("Invalid data: " + coordStr);
   }
+  
+  // Reset buffer
+  bufferIndex = 0;
 }
 
 // Move servos based on face coordinates
@@ -210,16 +199,136 @@ void moveServosToFace() {
   pwm.setPWM(2, 0, zPos); // Z-axis servo
 }
 
-void setServoPulse(uint8_t n, double pulse) {
-  double pulselength;
- 
-  pulselength = 1000000;   // 1,000,000 us per second
-  pulselength /= SERVO_FREQ;   // Analog servos run at ~60 Hz updates
-  Serial.print(pulselength); Serial.println(" us per period");
-  pulselength /= 4096;  // 12 bits of resolution
-  Serial.print(pulselength); Serial.println(" us per bit");
-  pulse *= 1000000;  // convert input seconds to us
-  pulse /= pulselength;
-  Serial.println(pulse);
-  pwm.setPWM(n, 0, pulse);
+// Add message to log buffer
+void addToLog(String message) {
+  // Add timestamp
+  unsigned long timeStamp = millis() / 1000;  // seconds since start
+  String timeStr = String(timeStamp) + "s: ";
+  
+  // Add to log array
+  serialLogs[logIndex] = timeStr + message;
+  logIndex = (logIndex + 1) % MAX_LOG_ENTRIES;  // Circular buffer
+  
+  // Also print to debug serial
+  Serial.println(timeStr + message);
+}
+
+// Handle root URL
+void handleRoot() {
+  String html = "<!DOCTYPE html>";
+  html += "<html>";
+  html += "<head>";
+  html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+  html += "<title>Face Tracking and Servo Control</title>";
+  html += "<style>";
+  html += "body { font-family: Arial, sans-serif; margin: 20px; background-color: #f0f0f0; }";
+  html += "h1 { color: #0066cc; }";
+  html += "#logContainer { background-color: #1e1e1e; color: #dcdcdc; padding: 10px; border-radius: 5px; height: 30vh; overflow-y: scroll; margin-top: 20px; font-family: monospace; white-space: pre-wrap; }";
+  html += ".faceCoordinates { background-color: #ffffff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }";
+  html += ".coordinate { display: inline-block; margin: 0 20px; text-align: center; }";
+  html += ".value { font-size: 36px; font-weight: bold; color: #0066cc; }";
+  html += ".label { font-size: 14px; color: #666; margin-top: 5px; }";
+  html += ".status { font-size: 16px; margin-top: 15px; color: #333; }";
+  html += ".face-status { font-weight: bold; }";
+  html += ".face-detected { color: green; }";
+  html += ".face-not-detected { color: red; }";
+  html += ".refresh-note { font-size: 12px; color: #666; margin-top: 10px; }";
+  html += ".servo-info { margin-top: 20px; background-color: #f9f9f9; padding: 10px; border-radius: 5px; }";
+  html += "</style>";
+  html += "<script>";
+  html += "function updateData() {";
+  html += "  updateCoordinates();";
+  html += "  updateLogs();";
+  html += "}";
+  html += "function updateLogs() {";
+  html += "  fetch('/logs')";
+  html += "    .then(response => response.text())";
+  html += "    .then(data => {";
+  html += "      document.getElementById('logContainer').innerHTML = data;";
+  html += "      document.getElementById('logContainer').scrollTop = document.getElementById('logContainer').scrollHeight;";
+  html += "    });";
+  html += "}";
+  html += "function updateCoordinates() {";
+  html += "  fetch('/coordinates')";
+  html += "    .then(response => response.json())";
+  html += "    .then(data => {";
+  html += "      document.getElementById('x-value').innerText = data.x;";
+  html += "      document.getElementById('y-value').innerText = data.y;";
+  html += "      document.getElementById('z-value').innerText = data.z;";
+  html += "      const statusElement = document.getElementById('face-status');";
+  html += "      if (data.detected) {";
+  html += "        statusElement.innerText = 'DETECTED';";
+  html += "        statusElement.className = 'face-status face-detected';";
+  html += "      } else {";
+  html += "        statusElement.innerText = 'NOT DETECTED';";
+  html += "        statusElement.className = 'face-status face-not-detected';";
+  html += "      }";
+  html += "    });";
+  html += "}";
+  html += "// Initial update and set interval";
+  html += "updateData();";
+  html += "setInterval(updateData, 500);";
+  html += "</script>";
+  html += "</head>";
+  html += "<body>";
+  html += "<h1>Face Tracking and Servo Control</h1>";
+  html += "<div class='faceCoordinates'>";
+  html += "<div class='coordinate'>";
+  html += "<div class='value' id='x-value'>" + String(x) + "</div>";
+  html += "<div class='label'>X-Coordinate</div>";
+  html += "</div>";
+  html += "<div class='coordinate'>";
+  html += "<div class='value' id='y-value'>" + String(y) + "</div>";
+  html += "<div class='label'>Y-Coordinate</div>";
+  html += "</div>";
+  html += "<div class='coordinate'>";
+  html += "<div class='value' id='z-value'>" + String(z) + "</div>";
+  html += "<div class='label'>Z-Coordinate</div>";
+  html += "</div>";
+  html += "<div class='status'>Status: <span id='face-status' class='face-status " + String(faceDetected ? "face-detected" : "face-not-detected") + "'>" + String(faceDetected ? "DETECTED" : "NOT DETECTED") + "</span></div>";
+  html += "<div class='refresh-note'>Data refreshes automatically every 500ms</div>";
+  html += "</div>";
+  html += "<div class='servo-info'>";
+  html += "<h2>Servo Control</h2>";
+  html += "<p>Servos on channels 0-2 will track face coordinates:</p>";
+  html += "<ul>";
+  html += "<li>Channel 0: X-axis Servo</li>";
+  html += "<li>Channel 1: Y-axis Servo</li>";
+  html += "<li>Channel 2: Z-axis Servo</li>";
+  html += "</ul>";
+  html += "</div>";
+  html += "<h2>Communication Log</h2>";
+  html += "<div id='logContainer'></div>";
+  html += "</body>";
+  html += "</html>";
+  
+  server.send(200, "text/html", html);
+}
+
+// Handle logs request
+void handleLogs() {
+  String logs = "";
+  
+  // Start from the oldest entry
+  int startIndex = (logIndex + 1) % MAX_LOG_ENTRIES;
+  for (int i = 0; i < MAX_LOG_ENTRIES; i++) {
+    int idx = (startIndex + i) % MAX_LOG_ENTRIES;
+    if (serialLogs[idx].length() > 0) {
+      logs += serialLogs[idx] + "<br>";
+    }
+  }
+  
+  server.send(200, "text/html", logs);
+}
+
+// Handle coordinates request
+void handleCoordinates() {
+  String json = "{";
+  json += "\"x\":" + String(x) + ",";
+  json += "\"y\":" + String(y) + ",";
+  json += "\"z\":" + String(z) + ",";
+  json += "\"detected\":" + String(faceDetected ? "true" : "false");
+  json += "}";
+  
+  server.send(200, "application/json", json);
 }
