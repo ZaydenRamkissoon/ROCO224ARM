@@ -73,9 +73,10 @@ void setup() {
 }
 
 void loop() {
+  Serial.write("hi");
   // Check for incoming data from facial recognition system
   readFaceCoordinates();
- 
+ Serial.write("hi");
   // If face coordinates received, move servos accordingly
   if (newDataAvailable) {
     moveServosToFace();
@@ -89,19 +90,26 @@ void loop() {
 
     while(1)
     {
+      Serial.write("hiiiiii");
+      for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) 
+      {
+        pwm.setPWM(3, 0, pulselen); // command that moves the servo
+        delay(5);
+      }
+      // pwm.setPWM(3, 0, 210); // command that stops the 360 motor
+           //delay(100);
 
-for (uint16_t pulselen = 0; pulselen < 500; pulselen+=10) {
-            pwm.setPWM(3, 0, 210); // command that moves the servo
-            delay(500);
-            Serial.print(pulselen);
-          }
+      for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen--) 
+      {
+        pwm.setPWM(3, 0, pulselen); // command that moves the servo
+        delay(5);
+      }
 
-/*for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) {
-      pwm.setPWM(0, 0, pulselen); // command that moves the servo
-    }*/
-          //pwm.setPWM(0, 0, 80); // command that moves the servo
-delay(500);
-      /*for (uint16_t pulselen = 0; pulselen < 500; pulselen++) {
+      //  pwm.setPWM(3, 0, 210); // command that stops the 360 motor
+      //delay(10);
+      //pwm.setPWM(0, 0, 80); // command that moves the servo
+      delay(50);
+      /*for (uint16_t pulselen = 500; pulselen > 0; pulselen--) {
             pwm.setPWM(0, 0, pulselen); // command that moves the servo
           }*/
 
