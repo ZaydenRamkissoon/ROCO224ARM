@@ -38,13 +38,16 @@ float gear1 = 1;
 float gear2 = 1;
 float gear3 = 1;
 float gear4 = 1;
+int testflag = 0;
 
 // New variables for improved face detection
 char buffer[16];
 int bufferIndex = 0;
 bool newDataAvailable = false;
 
-void setup() {
+
+void setup() 
+{
   pinMode(2, OUTPUT);
   Serial.begin(9600);
   Serial.println("8 channel Servo test!");
@@ -72,24 +75,75 @@ void setup() {
   delay(10);
 }
 
-void loop() {
+void loop() 
+{
   Serial.write("hi");
   // Check for incoming data from facial recognition system
   readFaceCoordinates();
- Serial.write("hi");
+  Serial.write("hi");
   // If face coordinates received, move servos accordingly
-  if (newDataAvailable) {
+  if (newDataAvailable) 
+  {
     moveServosToFace();
     newDataAvailable = false;
   }
  
   // Original servo demo code (will run when no face data is available)
-  if (!Serial.available()) {
-
-
-
-    while(1)
+  if (!Serial.available()) 
+  {
+    
+    
+    if (testflag == 1)
     {
+      while(1)
+      {
+        if(Serial.read() == 's')
+        {
+          testflag = 0;
+          break;
+        }
+      }
+    }
+
+    //Trigger Finger = 0
+    //Elbow = 1
+    //Bicep Swivel = 2
+    //Capstan Shoulder = 3
+    while(1) //being used for testing
+    {
+
+      if(Serial.read() == 't')
+      {
+        testflag == 1;
+        break;
+      }
+
+      delay(10);
+      CapstanShoulderDegrees(360); //this function works up to 180 degrees. the smaller the angle, the less accurate.
+      delay(10);
+
+      /*
+      for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) 
+      {
+      pwm.setPWM(0, 0, pulselen); // command that moves the servo
+      delay(1);
+      }
+
+      delay(500);
+
+      for (uint16_t pulselen = SG90MAX; pulselen > SG90MIN; pulselen--) 
+      {
+        pwm.setPWM(0, 0, pulselen);
+        delay(1);
+      }*/
+
+
+
+
+
+
+
+      /*
       Serial.write("hiiiiii");
       for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) 
       {
@@ -103,7 +157,7 @@ void loop() {
       {
         pwm.setPWM(3, 0, pulselen); // command that moves the servo
         delay(5);
-      }
+      }*/
 
       //  pwm.setPWM(3, 0, 210); // command that stops the 360 motor
       //delay(10);
@@ -118,6 +172,7 @@ void loop() {
 
 
     // Drive each servo one at a time using setPWM()
+    /*
     for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) {
       pwm.setPWM(servonum, 0, pulselen); // command that moves the servo
     }
@@ -131,25 +186,111 @@ void loop() {
 
     servonum++;
     if (servonum > 7) servonum = 0; // Testing the first 8 servo channels
+    */
   }
+  if (Serial.read() == 's'){(loop);}
 }
 
+
+void TriggerDegrees(int Degrees)
+{
+  int Pos = map (Degrees , 0 , 200 , SG90MIN , SG90MAX);
+  for (uint16_t pulselen = SG90MIN; pulselen < Pos; pulselen++) 
+  {
+    pwm.setPWM(0, 0, pulselen); // command that moves the servo
+    delay(1);
+  }
+
+   delay(500);
+
+  for (uint16_t pulselen = Pos; pulselen > SG90MIN; pulselen--) 
+  {
+    pwm.setPWM(0, 0, pulselen);
+    delay(1);
+  }
+}  
+
+
+void BicepSwivelDegrees(int Degrees)
+{
+  int Pos = map (Degrees , 0 , 200 , SERVOMIN , SERVOMAX);
+  for (uint16_t pulselen = SERVOMIN; pulselen < Pos; pulselen++) 
+  {
+    pwm.setPWM(2, 0, pulselen); // command that moves the servo
+    delay(1);
+  }
+
+   delay(500);
+
+  for (uint16_t pulselen = Pos; pulselen > SERVOMIN; pulselen--) 
+  {
+    pwm.setPWM(2, 0, pulselen);
+    delay(1);
+  }
+}  
+
+
+
+void ElbowDegrees(int Degrees)
+{
+  int Pos = map (Degrees , 0 , 200 , SERVOMIN , SERVOMAX);
+  for (uint16_t pulselen = SERVOMIN; pulselen < Pos; pulselen++) 
+  {
+    pwm.setPWM(1, 0, pulselen); // command that moves the servo
+    delay(1);
+  }
+
+   delay(500);
+
+  for (uint16_t pulselen = Pos; pulselen > SERVOMIN; pulselen--) 
+  {
+    pwm.setPWM(1, 0, pulselen);
+    delay(1);
+  }
+}  
+
+
+void CapstanShoulderDegrees(int Degrees)
+{
+  int Pos = map (Degrees , 0 , 200 , SERVOMIN , SERVOMAX);
+  for (uint16_t pulselen = SERVOMIN; pulselen < Pos; pulselen++) 
+  {
+    pwm.setPWM(3, 0, pulselen); // command that moves the servo
+    delay(1);
+  }
+
+   delay(500);
+
+  for (uint16_t pulselen = Pos; pulselen > SERVOMIN; pulselen--) 
+  {
+    pwm.setPWM(3, 0, pulselen);
+    delay(1);
+  }
+}  
+
+
+
 // Read face coordinates from serial port
-void readFaceCoordinates() {
-  while (Serial.available() > 0) {
+void readFaceCoordinates() 
+{
+  while (Serial.available() > 0) 
+  {
     char inChar = Serial.read();
    
     // Check if this is the start of a coordinate packet
-    if (inChar == '(') {
+    if (inChar == '(') 
+    {
       bufferIndex = 0;
       buffer[bufferIndex++] = inChar;
     }
     // Add character to buffer
-    else if (bufferIndex > 0 && bufferIndex < 15) {
+    else if (bufferIndex > 0 && bufferIndex < 15) 
+    {
       buffer[bufferIndex++] = inChar;
      
       // Check if we have complete coordinates
-      if (inChar == ')') {
+      if (inChar == ')') 
+      {
         buffer[bufferIndex] = '\0'; // Null terminate
         parseCoordinates();
         newDataAvailable = true;
@@ -166,13 +307,17 @@ void readFaceCoordinates() {
 }
 
 // Parse coordinates from buffer in format "(xxx,yyy,zzz)"
-void parseCoordinates() {
+void parseCoordinates() 
+{
   // Check if the data format is correct
-  if (buffer[0] == '(' && buffer[bufferIndex-1] == ')') {
+  if (buffer[0] == '(' && buffer[bufferIndex-1] == ')') 
+  {
     // Extract X value (chars 1,2,3)
     xidx = 0;
-    for (int i = 1; i <= 3; i++) {
-      if (buffer[i] >= '0' && buffer[i] <= '9') {
+    for (int i = 1; i <= 3; i++) 
+    {
+      if (buffer[i] >= '0' && buffer[i] <= '9') 
+      {
         xarray[xidx++] = buffer[i];
       }
     }
@@ -180,8 +325,10 @@ void parseCoordinates() {
    
     // Extract Y value (chars 5,6,7)
     yidx = 0;
-    for (int i = 5; i <= 7; i++) {
-      if (buffer[i] >= '0' && buffer[i] <= '9') {
+    for (int i = 5; i <= 7; i++) 
+    {
+      if (buffer[i] >= '0' && buffer[i] <= '9') 
+      {
         yarray[yidx++] = buffer[i];
       }
     }
@@ -189,8 +336,10 @@ void parseCoordinates() {
    
     // Extract Z value (chars 9,10,11)
     zidx = 0;
-    for (int i = 9; i <= 11; i++) {
-      if (buffer[i] >= '0' && buffer[i] <= '9') {
+    for (int i = 9; i <= 11; i++) 
+    {
+      if (buffer[i] >= '0' && buffer[i] <= '9') 
+      {
         zarray[zidx++] = buffer[i];
       }
     }
@@ -206,7 +355,8 @@ void parseCoordinates() {
 }
 
 // Move servos based on face coordinates
-void moveServosToFace() {
+void moveServosToFace() 
+{
   // Map face coordinates to servo positions
   int xPos = map(x, 0, 999, SG90MIN, SG90MAX);
   int yPos = map(y, 0, 999, SG90MIN, SG90MAX);
