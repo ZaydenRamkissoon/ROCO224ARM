@@ -131,7 +131,7 @@ void loop()
         delay(5);
       }*/
       //CapstanShoulderDegrees(90); //this function works up to 180 degrees. the smaller the angle, the less accurate.
-      ElbowDegrees(90);
+      //ElbowDegrees(90);
       BicepSwivelDegrees(90);
       //TriggerDegrees(70);
       //CapstanShoulderDegrees(90);
