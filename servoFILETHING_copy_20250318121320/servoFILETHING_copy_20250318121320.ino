@@ -71,12 +71,18 @@ void setup()
    */
   pwm.setOscillatorFrequency(27000000);
   pwm.setPWMFreq(SERVO_FREQ);  // Analog servos run at ~50 Hz updates
-
   delay(10);
+
 }
 
 void loop() 
 {
+
+  /*while(1)
+  {
+    Serial.println("hi");
+    pwm.setPWM(0, 0, 300);
+  }*/
   Serial.write("hi");
   // Check for incoming data from facial recognition system
   readFaceCoordinates();
@@ -119,7 +125,24 @@ void loop()
       }
 
       delay(10);
-      CapstanShoulderDegrees(360); //this function works up to 180 degrees. the smaller the angle, the less accurate.
+      /*for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) 
+      {
+        pwm.setPWM(3, 0, pulselen); // command that moves the servo
+        delay(5);
+      }*/
+      //CapstanShoulderDegrees(90); //this function works up to 180 degrees. the smaller the angle, the less accurate.
+      ElbowDegrees(90);
+      BicepSwivelDegrees(90);
+      //TriggerDegrees(70);
+      //CapstanShoulderDegrees(90);
+      pwm.setPWM(3, 0, 210);
+      
+      /*for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen--) 
+      {
+        pwm.setPWM(3, 0, pulselen); // command that moves the servo
+        delay(500);
+      }
+      pwm.setPWM(3, 0, 210);*/
       delay(10);
 
       /*
@@ -252,7 +275,7 @@ void ElbowDegrees(int Degrees)
 
 void CapstanShoulderDegrees(int Degrees)
 {
-  int Pos = map (Degrees , 0 , 200 , SERVOMIN , SERVOMAX);
+  int Pos = map (Degrees , 0 , 180 , SERVOMIN , SERVOMAX);
   for (uint16_t pulselen = SERVOMIN; pulselen < Pos; pulselen++) 
   {
     pwm.setPWM(3, 0, pulselen); // command that moves the servo
