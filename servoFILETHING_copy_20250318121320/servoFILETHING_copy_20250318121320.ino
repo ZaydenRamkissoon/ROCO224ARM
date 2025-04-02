@@ -17,6 +17,17 @@ Adafruit_PWMServoDriver pwm = Adafruit_PWMServoDriver();
 #define SG90MIN 0
 #define SG90MAX 500
 
+// Constants for the arm dimensions in cm
+#define BICEP_LENGTH 15.0     // Length of the bicep segment (15 cm)
+#define FOREARM_LENGTH 18.0   // Length of the forearm segment (18 cm)
+
+// Position of the arm base (capstan drive) relative to the camera's coordinate system
+// These need to be set based on your actual setup
+#define ARM_BASE_X 0.0  // X coordinate of arm base in camera space (adjust as needed)
+#define ARM_BASE_Y 0.0  // Y coordinate of arm base in camera space (adjust as needed)
+#define ARM_BASE_Z 0.0  // Z coordinate of arm base in camera space (adjust as needed)
+
+
 // our servo # counter
 uint8_t servonum = 0;
 int rev = 0;
@@ -103,17 +114,29 @@ void loop()
     delay(10);
 
     pwm.setPWM(1 , 0 , SERVOMIN);
+    for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
+    {
+      pwm.setPWM(1 , 0, pulselen); // command that moves the servo
+      delay(100);
+    }
+    pwm.setPWM(1 , 0 , SERVOMIN);
+
+    /*pwm.setPWM(2 , 0 , SERVOMIN);
+    for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
+    {
+      pwm.setPWM(2 , 0, pulselen); // command that moves the servo
+      delay(100);
+    }
+    pwm.setPWM(2 , 0 , SERVOMIN);*/
+
+
     delay(500);
     pwm.setPWM(2 , 0 , SERVOMIN);
+    delay(10000000000000);
     delay(500);
     ONEWAYBicepSwivelDegrees(90);
     delay(500);
-    /*for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
-    {
-      pwm.setPWM(2, 0, pulselen); // command that moves the servo
-      delay(100);
-      if (pulselen == SERVOMIN+1){delay(500000000);}
-    }*/
+   
     ONEWAYElbowDegrees(90);
     delay(500);
     ONEWAYElbowDegreesBACK(0); //go back to 0
@@ -122,7 +145,7 @@ void loop()
     delay(500);
     pwm.setPWM(1 , 0 , SERVOMIN);
     delay(500);
-    TriggerDegrees(180);
+    //TriggerDegrees(180);
     delay(1000000000);
     //
 
@@ -443,19 +466,100 @@ void parseCoordinates()
   }
 }
 
-// Move servos based on face coordinates
+
+
+// Move arm to aim trigger finger at distant coordinates
 void moveServosToFace() 
 {
-  // Map face coordinates to servo positions
-  int xPos = map(x, 0, 999, SG90MIN, SG90MAX);
-  int yPos = map(y, 0, 999, SG90MIN, SG90MAX);
-  int zPos = map(z, 0, 999, SG90MIN, SG90MAX);
- 
-  // Move servos to follow face
-  pwm.setPWM(0, 0, xPos); // X-axis servo
-  pwm.setPWM(1, 0, yPos); // Y-axis servo
-  pwm.setPWM(2, 0, zPos); // Z-axis servo
+  // Convert the input coordinates (0-999) to real-world coordinates in cm
+  // Assuming the input coordinates are scaled for targets up to 1000cm away
+  float worldX = map(x, 0, 999, 0, 1000);  // Map x to a range of 0-1000 cm
+  float worldY = map(y, 0, 999, 0, 1000);  // Map y to a range of 0-1000 cm
+  float worldZ = map(z, 0, 999, 0, 1000);  // Map z to a range of 0-1000 cm
+  
+  // Debug output of raw coordinates
+  Serial.print("Target coordinates: (");
+  Serial.print(worldX);
+  Serial.print(", ");
+  Serial.print(worldY);
+  Serial.print(", ");
+  Serial.print(worldZ);
+  Serial.println(") cm");
+  
+  // Adjust coordinates relative to arm base (capstan drive position)
+  float targetX = worldX - ARM_BASE_X;
+  float targetY = worldY - ARM_BASE_Y;
+  float targetZ = worldZ - ARM_BASE_Z;
+  
+  // For aiming at distant targets, we need to compute the angles to point at the target
+  // Calculate the angles needed to aim at the target
+  
+  // Calculate bicep swivel angle (horizontal rotation, like azimuth)
+  // This is the angle in the XZ plane from the positive X axis
+  float bicepSwivelAngle = atan2(targetZ, targetX) * 180.0 / PI;
+  
+  // Adjust to match your servo's orientation - you may need to modify this offset
+  bicepSwivelAngle = bicepSwivelAngle + 90; // Add 90 degrees so 0 is forward
+  
+  // Ensure angle is in 0-180 range for servo
+  while (bicepSwivelAngle < 0) bicepSwivelAngle += 360;
+  while (bicepSwivelAngle > 360) bicepSwivelAngle -= 360;
+  
+  // Clamp to servo range
+  if (bicepSwivelAngle > 180) bicepSwivelAngle = 180;
+  if (bicepSwivelAngle < 0) bicepSwivelAngle = 0;
+  
+  // Calculate the horizontal distance to the target
+  float horizontalDistance = sqrt(targetX*targetX + targetZ*targetZ);
+  
+  // Calculate the elevation angle (vertical angle)
+  // This is the angle in the vertical plane from the horizontal
+  float elevationAngle = atan2(targetY, horizontalDistance) * 180.0 / PI;
+  
+  // For the elbow angle, we need to convert the elevation angle to an appropriate
+  // elbow angle that will point the arm at the target
+  
+  // The relationship depends on your specific arm configuration
+  // This is a simplified approach - you'll need to calibrate
+  // Note: this is a very basic approximation. For accurate aiming, you'll need
+  // to measure and map the relationship between elbow angle and elevation
+  
+  // Map elevation angle to elbow angle based on arm geometry
+  // Assuming 90° elbow angle gives horizontal aim
+  float elbowAngle = 90 - elevationAngle;
+  
+  // Adjust elbow angle into valid servo range (0-180)
+  if (elbowAngle < 0) elbowAngle = 0;
+  if (elbowAngle > 180) elbowAngle = 180;
+  
+  // For the trigger, use a fixed angle or adjust based on target distance if needed
+  float triggerAngle = 90; // Adjust based on your needs
+  
+  // Debug output of calculated angles
+  Serial.print("Bicep Swivel Angle: ");
+  Serial.print(bicepSwivelAngle);
+  Serial.println(" degrees");
+  
+  Serial.print("Elevation Angle: ");
+  Serial.print(elevationAngle);
+  Serial.println(" degrees");
+  
+  Serial.print("Elbow Angle: ");
+  Serial.print(elbowAngle);
+  Serial.println(" degrees");
+  
+  // Call your servo movement functions to position the arm
+  ONEWAYBicepSwivelDegrees(bicepSwivelAngle);
+  ONEWAYElbowDegrees(elbowAngle);
+  ONEWAYTriggerDegrees(triggerAngle);
+  
+  // Reset the flags
+  FACE_DETECTION_FLAG = 0;
+  newDataAvailable = false;
 }
+
+
+
 
 void setServoPulse(uint8_t n, double pulse) {
   double pulselength;
