@@ -86,33 +86,40 @@ void setup()
 
 }
 
+
+
+
 void loop() 
 {
   pwm.setPWM(3, 0, 210);
       
-  Serial.write("hi");
-  // Check for incoming data from facial recognition system
+  Serial.println("Ready for coordinate input in format (xxx,yyy,zzz)");
+  
+  // Check for incoming data from serial port
   readFaceCoordinates();
-  Serial.write("hi");
-  // If face coordinates received, move servos accordingly
+  
+  // If coordinates received, move servos accordingly
   if (newDataAvailable) 
   {
     moveServosToFace();
+    SetMinPositions(); // Reset to minimum positions after moving
     newDataAvailable = false;
   }
  
-  // Original servo demo code (will run when no face data is available)
+  // Original servo demo code (will run when no serial data is available)
   if (!Serial.available()) 
   {
-    
-
     //Trigger Finger = 0
     //Elbow = 1
     //Bicep Swivel = 2
     //Capstan Shoulder = 3
     
-    delay(10);
-
+    delay(500); // Reduced delay for better responsiveness to serial input
+    
+    // Initialize the arm to a known position
+    SetMinPositions();
+    
+    /* Comment out the infinite loops to allow the program to keep checking for serial input
     while(1){
       SetMinPositions();
       while(1){}
@@ -122,57 +129,38 @@ void loop()
       ONEWAYBicepSwivelDegrees(90);
       while(1){}
     }
-
+    */
+    
+    /* Comment out the test movements
     delay(500);
     pwm.setPWM(2 , 0 , SERVOMIN);
-    //delay(10000000000000);
     delay(500);
-    ONEWAYBicepSwivelDegreesBACK(0 , 90);//go back to zero
-    //ONEWAYBicepSwivelDegrees(90);
+    ONEWAYBicepSwivelDegreesBACK(0 , 90);
     delay(500);
    
     ONEWAYElbowDegrees(70);
     delay(500);
-    ONEWAYElbowDegreesBACK(0 , 70); //go back to 0
+    ONEWAYElbowDegreesBACK(0 , 70);
     delay(500);
-    //ONEWAYBicepSwivelDegreesBACK(0 , 90);//go back to zero
     ONEWAYBicepSwivelDegrees(90);
     delay(500);
     pwm.setPWM(1 , 0 , SERVOMIN);
     delay(500);
-    //TriggerDegrees(180);
     SetMinPositions();
     delay(1000000000);
-  
-
+    */
+    
+    /* Keep original comments as is
     //CapstanShoulderDegrees(90); //this function works up to 180 degrees. the smaller the angle, the less accurate.
     //ElbowDegrees(90);
     //BicepSwivelDegrees(90);
     //TriggerDegrees(70);
     //CapstanShoulderDegrees(1);
-    /*for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
-    {
-      pwm.setPWM(3, 0, pulselen); // command that moves the servo
-      delay(100);
-      if (pulselen == SERVOMIN+1){delay(500000000);}
-    }
-      
-    for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) 
-    {
-    pwm.setPWM(3, 0, pulselen); // command that moves the servo
-    delay(100);
-    }*/
-
-    pwm.setPWM(3, 0, 210);
-      
-      
-    delay(10);
-
-    //DriveEachServoOneAtATime();
-
-    delay(1000);
+    */
+    
+    delay(1000); // Wait a second before checking again
   }  
-}    
+}   
       
 
 
@@ -451,58 +439,104 @@ void parseCoordinates()
   // Check if the data format is correct
   if (buffer[0] == '(' && buffer[bufferIndex-1] == ')') 
   {
-    // Extract X value (chars 1,2,3)
-    xidx = 0;
-    for (int i = 1; i <= 3; i++) 
+    // Reset indices
+    xidx = yidx = zidx = 0;
+    
+    // Initialize parsing state (0=parsing x, 1=parsing y, 2=parsing z)
+    int parseState = 0;
+    bool isNegative[3] = {false, false, false}; // Track negative sign for each coordinate
+    
+    // Go through the buffer character by character
+    for (int i = 1; i < bufferIndex-1; i++) 
     {
+      // If we find a comma, move to the next coordinate
+      if (buffer[i] == ',') 
+      {
+        parseState++;
+        continue;
+      }
+      
+      // Check for negative sign
+      if (buffer[i] == '-' && ((parseState == 0 && xidx == 0) || 
+                               (parseState == 1 && yidx == 0) || 
+                               (parseState == 2 && zidx == 0))) 
+      {
+        isNegative[parseState] = true;
+        continue;
+      }
+      
+      // If it's a digit, add it to the appropriate array
       if (buffer[i] >= '0' && buffer[i] <= '9') 
       {
-        xarray[xidx++] = buffer[i];
+        switch (parseState) 
+        {
+          case 0: // X coordinate
+            if (xidx < sizeof(xarray)-1) // Prevent buffer overflow
+              xarray[xidx++] = buffer[i];
+            break;
+          case 1: // Y coordinate
+            if (yidx < sizeof(yarray)-1) // Prevent buffer overflow
+              yarray[yidx++] = buffer[i];
+            break;
+          case 2: // Z coordinate
+            if (zidx < sizeof(zarray)-1) // Prevent buffer overflow
+              zarray[zidx++] = buffer[i];
+            break;
+        }
       }
     }
+    
+    // Null-terminate the coordinate strings
     xarray[xidx] = '\0';
-   
-    // Extract Y value (chars 5,6,7)
-    yidx = 0;
-    for (int i = 5; i <= 7; i++) 
-    {
-      if (buffer[i] >= '0' && buffer[i] <= '9') 
-      {
-        yarray[yidx++] = buffer[i];
-      }
-    }
     yarray[yidx] = '\0';
-   
-    // Extract Z value (chars 9,10,11)
-    zidx = 0;
-    for (int i = 9; i <= 11; i++) 
-    {
-      if (buffer[i] >= '0' && buffer[i] <= '9') 
-      {
-        zarray[zidx++] = buffer[i];
-      }
-    }
     zarray[zidx] = '\0';
-   
-    // Convert string arrays to integers
-    x = atoi((char*)xarray);
-    y = atoi((char*)yarray);
-    z = atoi((char*)zarray);
-   
-    FACE_DETECTION_FLAG = 1;
+    
+    // Only convert to integers if we have valid data in each coordinate
+    if (xidx > 0 && yidx > 0 && zidx > 0) 
+    {
+      // Convert string arrays to integers
+      x = atoi((char*)xarray);
+      y = atoi((char*)yarray);
+      z = atoi((char*)zarray);
+      
+      // Apply negative sign if needed
+      if (isNegative[0]) x = -x;
+      if (isNegative[1]) y = -y;
+      if (isNegative[2]) z = -z;
+      
+      // Set flag to indicate valid face detection data
+      FACE_DETECTION_FLAG = 1;
+      
+      // Debug output
+      Serial.print("Parsed coordinates: x=");
+      Serial.print(x);
+      Serial.print(", y=");
+      Serial.print(y);
+      Serial.print(", z=");
+      Serial.println(z);
+    } 
+    else 
+    {
+      Serial.println("Invalid coordinate format");
+    }
+  }
+  else 
+  {
+    Serial.println("Invalid packet format");
   }
 }
+
 
 
 
 // Move arm to aim trigger finger at distant coordinates
 void moveServosToFace() 
 {
-  // Convert the input coordinates (0-999) to real-world coordinates in cm
-  // Assuming the input coordinates are scaled for targets up to 1000cm away
-  float worldX = map(x, 0, 999, 0, 1000);  // Map x to a range of 0-1000 cm
-  float worldY = map(y, 0, 999, 0, 1000);  // Map y to a range of 0-1000 cm
-  float worldZ = map(z, 0, 999, 0, 1000);  // Map z to a range of 0-1000 cm
+  // Convert the input coordinates to real-world coordinates in cm
+  // Now correctly handling the -1000 to +1000 range
+  float worldX = map(x, -1000, 1000, -1000, 1000);  // Map x to a range of -1000 to +1000 cm
+  float worldY = map(y, -1000, 1000, -1000, 1000);  // Map y to a range of -1000 to +1000 cm
+  float worldZ = map(z, -1000, 1000, -1000, 1000);  // Map z to a range of -1000 to +1000 cm
   
   // Debug output of raw coordinates
   Serial.print("Target coordinates: (");
