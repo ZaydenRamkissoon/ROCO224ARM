@@ -104,6 +104,8 @@ void loop()
 
     pwm.setPWM(1 , 0 , SERVOMIN);
     delay(500);
+    pwm.setPWM(2 , 0 , SERVOMIN);
+    delay(500);
     ONEWAYBicepSwivelDegrees(90);
     delay(500);
     /*for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
@@ -114,9 +116,9 @@ void loop()
     }*/
     ONEWAYElbowDegrees(90);
     delay(500);
-    ONEWAYElbowDegreesBACK(90);
+    ONEWAYElbowDegreesBACK(0); //go back to 0
     delay(500);
-    ONEWAYBicepSwivelDegreesBACK(90);
+    ONEWAYBicepSwivelDegreesBACK(0);//go back to zero
     delay(500);
     pwm.setPWM(1 , 0 , SERVOMIN);
     delay(500);
@@ -221,7 +223,7 @@ void ONEWAYBicepSwivelDegrees(int Degrees)
    delay(500);
 }
 
-void ONEWAYElbowDegreesBACK(int Degrees)
+void ONEWAYBicepSwivelDegreesBACK(int Degrees)
 {
   int Pos = map (Degrees , 0 , 200 , SERVOMIN , SERVOMAX);
   for (uint16_t pulselen = SERVOMAX; pulselen > Pos; pulselen--) 
