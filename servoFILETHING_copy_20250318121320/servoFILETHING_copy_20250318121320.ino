@@ -77,12 +77,8 @@ void setup()
 
 void loop() 
 {
-
-  /*while(1)
-  {
-    Serial.println("hi");
-    pwm.setPWM(0, 0, 300);
-  }*/
+  pwm.setPWM(3, 0, 210);
+      
   Serial.write("hi");
   // Check for incoming data from facial recognition system
   readFaceCoordinates();
@@ -98,101 +94,58 @@ void loop()
   if (!Serial.available()) 
   {
     
-    
-    if (testflag == 1)
-    {
-      while(1)
-      {
-        if(Serial.read() == 's')
-        {
-          testflag = 0;
-          break;
-        }
-      }
-    }
 
     //Trigger Finger = 0
     //Elbow = 1
     //Bicep Swivel = 2
     //Capstan Shoulder = 3
-    while(1) //being used for testing
+    
+    delay(10);
+
+    pwm.setPWM(1 , 0 , SERVOMIN);
+    delay(500);
+    ONEWAYBicepSwivelDegrees(90);
+    delay(500);
+    /*for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
     {
+      pwm.setPWM(2, 0, pulselen); // command that moves the servo
+      delay(100);
+      if (pulselen == SERVOMIN+1){delay(500000000);}
+    }*/
+    ONEWAYElbowDegrees(90);
+    delay(500);
+    ONEWAYElbowDegreesBACK(90);
+    delay(500);
+    ONEWAYBicepSwivelDegreesBACK(90);
+    delay(500);
+    pwm.setPWM(1 , 0 , SERVOMIN);
+    delay(500);
+    TriggerDegrees(180);
+    delay(1000000000);
+    //
 
-      if(Serial.read() == 't')
-      {
-        testflag == 1;
-        break;
-      }
-
-      delay(10);
-      /*for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) 
-      {
-        pwm.setPWM(3, 0, pulselen); // command that moves the servo
-        delay(5);
-      }*/
-      //CapstanShoulderDegrees(90); //this function works up to 180 degrees. the smaller the angle, the less accurate.
-      //ElbowDegrees(90);
-      BicepSwivelDegrees(90);
-      //TriggerDegrees(70);
-      //CapstanShoulderDegrees(90);
-      pwm.setPWM(3, 0, 210);
-      
-      /*for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen--) 
-      {
-        pwm.setPWM(3, 0, pulselen); // command that moves the servo
-        delay(500);
-      }
-      pwm.setPWM(3, 0, 210);*/
-      delay(10);
-
-      /*
-      for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) 
-      {
-      pwm.setPWM(0, 0, pulselen); // command that moves the servo
-      delay(1);
-      }
-
-      delay(500);
-
-      for (uint16_t pulselen = SG90MAX; pulselen > SG90MIN; pulselen--) 
-      {
-        pwm.setPWM(0, 0, pulselen);
-        delay(1);
-      }*/
-
-
-
-
-
-
-
-      /*
-      Serial.write("hiiiiii");
-      for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen++) 
-      {
-        pwm.setPWM(3, 0, pulselen); // command that moves the servo
-        delay(5);
-      }
-      // pwm.setPWM(3, 0, 210); // command that stops the 360 motor
-           //delay(100);
-
-      for (uint16_t pulselen = SG90MIN; pulselen < SG90MAX; pulselen--) 
-      {
-        pwm.setPWM(3, 0, pulselen); // command that moves the servo
-        delay(5);
-      }*/
-
-      //  pwm.setPWM(3, 0, 210); // command that stops the 360 motor
-      //delay(10);
-      //pwm.setPWM(0, 0, 80); // command that moves the servo
-      delay(50);
-      /*for (uint16_t pulselen = 500; pulselen > 0; pulselen--) {
-            pwm.setPWM(0, 0, pulselen); // command that moves the servo
-          }*/
-
+    //CapstanShoulderDegrees(90); //this function works up to 180 degrees. the smaller the angle, the less accurate.
+    //ElbowDegrees(90);
+    //BicepSwivelDegrees(90);
+    //TriggerDegrees(70);
+    //CapstanShoulderDegrees(1);
+    /*for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
+    {
+      pwm.setPWM(3, 0, pulselen); // command that moves the servo
+      delay(100);
+      if (pulselen == SERVOMIN+1){delay(500000000);}
     }
       
+    for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) 
+    {
+    pwm.setPWM(3, 0, pulselen); // command that moves the servo
+    delay(100);
+    }*/
 
+    pwm.setPWM(3, 0, 210);
+      
+      
+    delay(10);
 
     // Drive each servo one at a time using setPWM()
     /*
@@ -210,10 +163,33 @@ void loop()
     servonum++;
     if (servonum > 7) servonum = 0; // Testing the first 8 servo channels
     */
-  }
-  if (Serial.read() == 's'){(loop);}
-}
 
+
+
+
+    delay(1000);
+  }  
+}    
+      
+
+
+    
+  
+  
+
+
+
+void ONEWAYTriggerDegrees(int Degrees)
+{
+  int Pos = map (Degrees , 0 , 200 , SG90MIN , SG90MAX);
+  for (uint16_t pulselen = SG90MIN; pulselen < Pos; pulselen++) 
+  {
+    pwm.setPWM(0, 0, pulselen); // command that moves the servo
+    delay(10);
+  }
+
+   delay(500);
+}
 
 void TriggerDegrees(int Degrees)
 {
@@ -221,7 +197,7 @@ void TriggerDegrees(int Degrees)
   for (uint16_t pulselen = SG90MIN; pulselen < Pos; pulselen++) 
   {
     pwm.setPWM(0, 0, pulselen); // command that moves the servo
-    delay(1);
+    delay(10);
   }
 
    delay(500);
@@ -229,9 +205,34 @@ void TriggerDegrees(int Degrees)
   for (uint16_t pulselen = Pos; pulselen > SG90MIN; pulselen--) 
   {
     pwm.setPWM(0, 0, pulselen);
-    delay(1);
+    delay(10);
   }
 }  
+
+void ONEWAYBicepSwivelDegrees(int Degrees)
+{
+  int Pos = map (Degrees , 0 , 200 , SERVOMIN , SERVOMAX);
+  for (uint16_t pulselen = SERVOMIN; pulselen < Pos; pulselen++) 
+  {
+    pwm.setPWM(2, 0, pulselen); // command that moves the servo
+    delay(10);
+  }
+
+   delay(500);
+}
+
+void ONEWAYElbowDegreesBACK(int Degrees)
+{
+  int Pos = map (Degrees , 0 , 200 , SERVOMIN , SERVOMAX);
+  for (uint16_t pulselen = SERVOMAX; pulselen > Pos; pulselen--) 
+  {
+    pwm.setPWM(2, 0, pulselen); // command that moves the servo
+    delay(10);
+  }
+
+   delay(500);
+}
+
 
 
 void BicepSwivelDegrees(int Degrees)
@@ -240,7 +241,7 @@ void BicepSwivelDegrees(int Degrees)
   for (uint16_t pulselen = SERVOMIN; pulselen < Pos; pulselen++) 
   {
     pwm.setPWM(2, 0, pulselen); // command that moves the servo
-    delay(1);
+    delay(10);
   }
 
    delay(500);
@@ -248,10 +249,54 @@ void BicepSwivelDegrees(int Degrees)
   for (uint16_t pulselen = Pos; pulselen > SERVOMIN; pulselen--) 
   {
     pwm.setPWM(2, 0, pulselen);
-    delay(1);
+    delay(10);
   }
 }  
 
+
+void INITIALFINALBicepSwivelDegrees(int Degrees1 , int Degrees2)
+{
+  int Pos1 = map (Degrees1 , 0 , 200 , SERVOMIN , SERVOMAX);
+  int Pos2 = map (Degrees2 , 0 , 200 , SERVOMIN , SERVOMAX);
+  for (uint16_t pulselen = Pos1; pulselen < Pos2; pulselen++) 
+  {
+    pwm.setPWM(2, 0, pulselen); // command that moves the servo
+    delay(10);
+  }
+
+   delay(500);
+
+  for (uint16_t pulselen = Pos2; pulselen > Pos1; pulselen--) 
+  {
+    pwm.setPWM(2, 0, pulselen);
+    delay(10);
+  }
+}
+
+
+void ONEWAYElbowDegrees(int Degrees)
+{
+  int Pos = map (Degrees , 0 , 200 , SERVOMIN , SERVOMAX);
+  for (uint16_t pulselen = SERVOMIN; pulselen < Pos; pulselen++) 
+  {
+    pwm.setPWM(1, 0, pulselen); // command that moves the servo
+    delay(10);
+  }
+
+   delay(500);
+}
+
+void ONEWAYElbowDegreesBACK(int Degrees)
+{
+  int Pos = map (Degrees , 0 , 200 , SERVOMIN , SERVOMAX);
+  for (uint16_t pulselen = SERVOMAX; pulselen > Pos; pulselen--) 
+  {
+    pwm.setPWM(1, 0, pulselen); // command that moves the servo
+    delay(10);
+  }
+
+   delay(500);
+}
 
 
 void ElbowDegrees(int Degrees)
@@ -260,7 +305,7 @@ void ElbowDegrees(int Degrees)
   for (uint16_t pulselen = SERVOMIN; pulselen < Pos; pulselen++) 
   {
     pwm.setPWM(1, 0, pulselen); // command that moves the servo
-    delay(1);
+    delay(10);
   }
 
    delay(500);
@@ -268,9 +313,28 @@ void ElbowDegrees(int Degrees)
   for (uint16_t pulselen = Pos; pulselen > SERVOMIN; pulselen--) 
   {
     pwm.setPWM(1, 0, pulselen);
-    delay(1);
+    delay(10);
   }
 }  
+
+void INITIALFINALElbowDegrees(int Degrees1 , int Degrees2)
+{
+  int Pos1 = map (Degrees1 , 0 , 200 , SERVOMIN , SERVOMAX);
+  int Pos2 = map (Degrees2 , 0 , 200 , SERVOMIN , SERVOMAX);
+  for (uint16_t pulselen = Pos1; pulselen < Pos2; pulselen++) 
+  {
+    pwm.setPWM(1, 0, pulselen); // command that moves the servo
+    delay(10);
+  }
+
+   delay(500);
+
+  for (uint16_t pulselen = Pos2; pulselen > Pos1; pulselen--) 
+  {
+    pwm.setPWM(1, 0, pulselen);
+    delay(10);
+  }
+}
 
 
 void CapstanShoulderDegrees(int Degrees)
