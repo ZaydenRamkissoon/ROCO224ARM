@@ -24,6 +24,11 @@
 #define ARM_BASE_Y 0.0  // Y coordinate of arm base in camera space (adjust as needed)
 #define ARM_BASE_Z 0.0  // Z coordinate of arm base in camera space (adjust as needed)
 
+#define Wrist 0
+#define Elbow 1
+#define BicepSwivel 2
+#define CapstanShoulder 3
+
 // External variables declarations
 extern Adafruit_PWMServoDriver pwm;
 extern uint8_t servonum;
@@ -43,8 +48,8 @@ extern bool newDataAvailable;
 // Function prototypes
 void DriveEachServoOneAtATime();
 void SetMinPositions();
-void ONEWAYTriggerDegrees(int Degrees);
-void TriggerDegrees(int Degrees);
+void ONEWAYWristDegrees(int Degrees);
+void WristDegrees(int Degrees);
 void ONEWAYBicepSwivelDegrees(int Degrees);
 void ONEWAYBicepSwivelDegreesBACK(int final, int initial);
 void BicepSwivelDegrees(int Degrees);
@@ -58,6 +63,12 @@ void readFaceCoordinates();
 void parseCoordinates();
 void moveServosToFace();
 void setServoPulse(uint8_t n, double pulse);
+// Add these function prototypes
+void ONEWAYWristDegreesBACK(int final, int initial);
+void INITIALFINALWristDegrees(int Degrees1, int Degrees2);
+void ONEWAYCapstanShoulderDegrees(int Degrees);
+void ONEWAYCapstanShoulderDegreesBACK(int final, int initial);
+void INITIALFINALCapstanShoulderDegrees(int Degrees1, int Degrees2);
 
 // Implementation of the functions
 inline void DriveEachServoOneAtATime()
@@ -65,7 +76,11 @@ inline void DriveEachServoOneAtATime()
   while(1)
   {
     // Drive each servo one at a time using setPWM()
-      
+    if(servonum==3)
+    {
+      continue;
+    }
+    
     for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) 
     {
       pwm.setPWM(servonum, 0, pulselen); // command that moves the servo
@@ -82,12 +97,27 @@ inline void DriveEachServoOneAtATime()
       delay(500);
 
       servonum++;
-      if (servonum > 7) servonum = 0; // Testing the first 8 servo channels
+      
+      if (servonum > 7) 
+      {
+        servonum = 0; // Testing the first 8 servo channels
+        break; //if you want it to exit the function instead of carrying on forever
+      }
   }
 }
 
 inline void SetMinPositions()
 {
+  pwm.setPWM(0, 0, SG90MIN);
+  int Pos = map(90, 0, 200, SG90MIN, SG90MAX);
+  pwm.setPWM(0, 0, Pos);
+  for (uint16_t pulselen = SG90MAX; pulselen > Pos; pulselen--) 
+  {
+    pwm.setPWM(0, 0, pulselen);
+    delay(20);
+  }
+  pwm.setPWM(0, 0, Pos);
+
   pwm.setPWM(1, 0, SERVOMIN);
   for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
   {
@@ -105,7 +135,7 @@ inline void SetMinPositions()
   pwm.setPWM(2, 0, SERVOMIN);
 }
 
-inline void ONEWAYTriggerDegrees(int Degrees)
+inline void ONEWAYWristDegrees(int Degrees)
 {
   int Pos = map(Degrees, 0, 200, SG90MIN, SG90MAX);
   for (uint16_t pulselen = SG90MIN; pulselen < Pos; pulselen++) 
@@ -116,7 +146,7 @@ inline void ONEWAYTriggerDegrees(int Degrees)
   delay(500);
 }
 
-inline void TriggerDegrees(int Degrees)
+inline void WristDegrees(int Degrees)
 {
   int Pos = map(Degrees, 0, 200, SG90MIN, SG90MAX);
   for (uint16_t pulselen = SG90MIN; pulselen < Pos; pulselen++) 
@@ -247,23 +277,6 @@ inline void INITIALFINALElbowDegrees(int Degrees1, int Degrees2)
   }
 }
 
-inline void CapstanShoulderDegrees(int Degrees)
-{
-  int Pos = map(Degrees, 0, 180, SERVOMIN, SERVOMAX);
-  for (uint16_t pulselen = SERVOMIN; pulselen < Pos; pulselen++) 
-  {
-    pwm.setPWM(3, 0, pulselen); // command that moves the servo
-    delay(1);
-  }
-  delay(500);
-
-  for (uint16_t pulselen = Pos; pulselen > SERVOMIN; pulselen--) 
-  {
-    pwm.setPWM(3, 0, pulselen);
-    delay(1);
-  }
-}
-
 inline void readFaceCoordinates() 
 {
   while (Serial.available() > 0) 
@@ -336,15 +349,15 @@ inline void parseCoordinates()
         switch (parseState) 
         {
           case 0: // X coordinate
-            if (xidx < sizeof(xarray)-1) // Prevent buffer overflow
+            if (xidx < 2) // Prevent buffer overflow (max index is 2 for a 3-element array)
               xarray[xidx++] = buffer[i];
             break;
           case 1: // Y coordinate
-            if (yidx < sizeof(yarray)-1) // Prevent buffer overflow
+            if (yidx < 2) // Prevent buffer overflow
               yarray[yidx++] = buffer[i];
             break;
           case 2: // Z coordinate
-            if (zidx < sizeof(zarray)-1) // Prevent buffer overflow
+            if (zidx < 2) // Prevent buffer overflow
               zarray[zidx++] = buffer[i];
             break;
         }
@@ -443,8 +456,8 @@ inline void moveServosToFace()
   if (elbowAngle < 0) elbowAngle = 0;
   if (elbowAngle > 180) elbowAngle = 180;
   
-  // For the trigger, use a fixed angle or adjust based on target distance if needed
-  float triggerAngle = 90; // Adjust based on your needs
+  // For the wrist, use a fixed angle or adjust based on target distance if needed
+  float wristAngle = 90; // Adjust based on your needs
   
   // Debug output of calculated angles
   Serial.print("Bicep Swivel Angle: ");
@@ -462,7 +475,7 @@ inline void moveServosToFace()
   // Call the servo movement functions to position the arm
   ONEWAYBicepSwivelDegrees(bicepSwivelAngle);
   ONEWAYElbowDegrees(elbowAngle);
-  ONEWAYTriggerDegrees(triggerAngle);
+  ONEWAYWristDegrees(wristAngle);
   
   // Reset the flags
   FACE_DETECTION_FLAG = 0;
@@ -484,4 +497,225 @@ inline void setServoPulse(uint8_t n, double pulse)
   pwm.setPWM(n, 0, pulse);
 }
 
-#endif // FUNCTIONS_H
+// Additional wrist functions
+inline void ONEWAYWristDegreesBACK(int final, int initial)
+{
+  int Pos = map(final, 0, 200, SG90MIN, SG90MAX);
+  for (uint16_t pulselen = initial; pulselen > Pos; pulselen--) 
+  {
+    pwm.setPWM(0, 0, pulselen); // command that moves the servo
+    delay(10);
+  }
+  delay(500);
+}
+
+inline void INITIALFINALWristDegrees(int Degrees1, int Degrees2)
+{
+  int Pos1 = map(Degrees1, 0, 200, SG90MIN, SG90MAX);
+  int Pos2 = map(Degrees2, 0, 200, SG90MIN, SG90MAX);
+  for (uint16_t pulselen = Pos1; pulselen < Pos2; pulselen++) 
+  {
+    pwm.setPWM(0, 0, pulselen); // command that moves the servo
+    delay(10);
+  }
+  delay(500);
+
+  for (uint16_t pulselen = Pos2; pulselen > Pos1; pulselen--) 
+  {
+    pwm.setPWM(0, 0, pulselen);
+    delay(10);
+  }
+}
+
+// Additional capstan functions
+inline void ONEWAYCapstanShoulderDegrees(int Degrees)
+{
+  // Calculate how many full rotations we need
+  int fullRotations = Degrees / 360;
+  int remainingDegrees = Degrees % 360;
+  
+  // Map the remaining degrees to servo pulse values
+  int finalPos = map(remainingDegrees, 0, 180, SERVOMIN, SERVOMAX);
+  
+  // Perform full 360-degree rotations first
+  for (int rotation = 0; rotation < fullRotations; rotation++) {
+    // One full rotation: 0 -> 180 -> 0 -> 180 -> 0
+    // First half rotation (0 to 180)
+    for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+    
+    // Second half rotation (180 to 360, represented as 180 back to 0)
+    for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+  
+  // Handle any remaining degrees (less than 360)
+  if (remainingDegrees > 0) {
+    for (uint16_t pulselen = SERVOMIN; pulselen < finalPos; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+}
+
+inline void ONEWAYCapstanShoulderDegreesBACK(int final, int initial)
+{
+  // For the backward rotation, we need to compute positions differently
+  int startPos = map(initial % 180, 0, 180, SERVOMIN, SERVOMAX);
+  int endPos = map(final % 180, 0, 180, SERVOMIN, SERVOMAX);
+  
+  // Calculate full rotations needed
+  int degreesDiff = initial - final;
+  int fullRotations = degreesDiff / 360;
+  int remainingDegrees = degreesDiff % 360;
+  
+  // First handle remaining degrees if starting position is higher than ending
+  if (startPos > endPos) {
+    for (uint16_t pulselen = startPos; pulselen > endPos; pulselen--) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+  // If starting position is lower, we need to go back to SERVOMIN and then from SERVOMAX down
+  else if (startPos < endPos) {
+    // Go from start to SERVOMIN
+    for (uint16_t pulselen = startPos; pulselen > SERVOMIN; pulselen--) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+    // Go from SERVOMAX to end
+    for (uint16_t pulselen = SERVOMAX; pulselen > endPos; pulselen--) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+  
+  // Perform full 360-degree rotations
+  for (int rotation = 0; rotation < fullRotations; rotation++) {
+    // One full rotation backward: 180 -> 0 -> 180 -> 0
+    // First half rotation (180 to 0)
+    for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+    
+    // Second half rotation (0 to 180)
+    for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+  delay(500);
+}
+
+inline void INITIALFINALCapstanShoulderDegrees(int Degrees1, int Degrees2)
+{
+  // Map initial and final positions to servo values
+  int Pos1 = map(Degrees1 % 180, 0, 180, SERVOMIN, SERVOMAX);
+  int Pos2 = map(Degrees2 % 180, 0, 180, SERVOMIN, SERVOMAX);
+  
+  // Calculate number of full rotations
+  int degreesDiff = abs(Degrees2 - Degrees1);
+  int fullRotations = degreesDiff / 360;
+  
+  // Move from initial to final position
+  if (Pos1 < Pos2) {
+    for (uint16_t pulselen = Pos1; pulselen < Pos2; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  } else if (Pos1 > Pos2) {
+    // Need to complete a full rotation
+    // First go to max
+    for (uint16_t pulselen = Pos1; pulselen < SERVOMAX; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+    // Then from min to final position
+    for (uint16_t pulselen = SERVOMIN; pulselen < Pos2; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+  delay(500);
+  
+  // Perform additional rotations if needed
+  for (int i = 0; i < fullRotations; i++) {
+    // Complete a full 360 degree rotation
+    for (uint16_t pulselen = Pos2; pulselen < SERVOMAX; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+    for (uint16_t pulselen = SERVOMIN; pulselen < Pos2; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+  
+  // Return to the initial position
+  if (Pos2 > Pos1) {
+    for (uint16_t pulselen = Pos2; pulselen > Pos1; pulselen--) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  } else if (Pos2 < Pos1) {
+    // Need to complete a full rotation backward
+    // First go to min
+    for (uint16_t pulselen = Pos2; pulselen > SERVOMIN; pulselen--) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+    // Then from max to initial position
+    for (uint16_t pulselen = SERVOMAX; pulselen > Pos1; pulselen--) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+}
+
+// Updated CapstanShoulderDegrees to handle unlimited rotation
+inline void CapstanShoulderDegrees(int Degrees)
+{
+  // Calculate how many full rotations we need
+  int fullRotations = Degrees / 360;
+  int remainingDegrees = Degrees % 360;
+  
+  // Map the remaining degrees to servo pulse values
+  int finalPos = map(remainingDegrees, 0, 180, SERVOMIN, SERVOMAX);
+  
+  // Perform full 360-degree rotations first
+  for (int rotation = 0; rotation < fullRotations; rotation++) {
+    // First half rotation (0 to 180)
+    for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+    
+    // Second half rotation (180 to 360, represented as 180 back to 0)
+    for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+  
+  // Handle any remaining degrees (less than 360)
+  if (remainingDegrees > 0) {
+    for (uint16_t pulselen = SERVOMIN; pulselen < finalPos; pulselen++) {
+      pwm.setPWM(3, 0, pulselen);
+      delay(1);
+    }
+  }
+  delay(500);
+
+  // Return to the starting position
+  for (uint16_t pulselen = finalPos; pulselen > SERVOMIN; pulselen--) {
+    pwm.setPWM(3, 0, pulselen);
+    delay(1);
+  }
+}
+
+#endif // FUNCTIONS_

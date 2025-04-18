@@ -59,54 +59,23 @@ void loop()
   // Original servo demo code (will run when no serial data is available)
   if (!Serial.available()) 
   {
-    //Trigger Finger = 0
+    
+    //Wrist = 0
     //Elbow = 1
     //Bicep Swivel = 2
     //Capstan Shoulder = 3
-    
+    //for the capstan, ++ makes the shaft rotate anti-clockwise (meaning the shoulder goes up/clockwise)
+    //therefore, -- makes the shaft rotate clockwise (meaning the shoulder goes down/anti-clockwise)
+    //capstan works on timers. capstandegrees(1) followed by time = how much it will rotate anglewise.
+
     delay(500); // Reduced delay for better responsiveness to serial input
     
     // Initialize the arm to a known position
     SetMinPositions();
+    pwm.setPWM(3, 0, 210);
+    delay(50000);
     
-    /* Comment out the infinite loops to allow the program to keep checking for serial input
-    while(1){
-      SetMinPositions();
-      while(1){}
-    }
-    while(1)//debug
-    {
-      ONEWAYBicepSwivelDegrees(90);
-      while(1){}
-    }
-    */
     
-    /* Comment out the test movements
-    delay(500);
-    pwm.setPWM(2 , 0 , SERVOMIN);
-    delay(500);
-    ONEWAYBicepSwivelDegreesBACK(0 , 90);
-    delay(500);
-   
-    ONEWAYElbowDegrees(70);
-    delay(500);
-    ONEWAYElbowDegreesBACK(0 , 70);
-    delay(500);
-    ONEWAYBicepSwivelDegrees(90);
-    delay(500);
-    pwm.setPWM(1 , 0 , SERVOMIN);
-    delay(500);
-    SetMinPositions();
-    delay(1000000000);
-    */
-    
-    /* Keep original comments as is
-    //CapstanShoulderDegrees(90); //this function works up to 180 degrees. the smaller the angle, the less accurate.
-    //ElbowDegrees(90);
-    //BicepSwivelDegrees(90);
-    //TriggerDegrees(70);
-    //CapstanShoulderDegrees(1);
-    */
     
     delay(1000); // Wait a second before checking again
   }  
