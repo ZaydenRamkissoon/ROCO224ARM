@@ -109,31 +109,74 @@ inline void DriveEachServoOneAtATime()
 inline void SetMinPositions()
 {
   pwm.setPWM(0, 0, SG90MIN);
-  int Pos = map(90, 0, 200, SG90MIN, SG90MAX);
-  pwm.setPWM(0, 0, Pos);
-  for (uint16_t pulselen = SG90MAX; pulselen > Pos; pulselen--) 
+  int WristNewMin = map(90, 0, 200, SG90MIN, SG90MAX);
+  pwm.setPWM(0, 0, WristNewMin);
+  for (uint16_t pulselen = SG90MAX; pulselen > WristNewMin; pulselen--) 
   {
     pwm.setPWM(0, 0, pulselen);
     delay(20);
   }
-  pwm.setPWM(0, 0, Pos);
+  pwm.setPWM(0, 0, WristNewMin);
 
   pwm.setPWM(1, 0, SERVOMIN);
   for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
   {
     pwm.setPWM(1, 0, pulselen); // command that moves the servo
-    delay(20);
+    delay(25);
   }
   pwm.setPWM(1, 0, SERVOMIN);
 
-  pwm.setPWM(2, 0, SERVOMIN);
-  for (uint16_t pulselen = SERVOMAX; pulselen > SERVOMIN; pulselen--) 
+  //This will work the other way around. "SERVOMAX" is closer to BicepNewMin, and SERVOMIN is analagous to the max of this servo.
+  int BicepNewMin = map(90, 0, 200, SERVOMIN, SERVOMAX);
+  pwm.setPWM(2, 0, BicepNewMin);
+  for (uint16_t pulselen = SERVOMIN; pulselen < BicepNewMin; pulselen++) 
   {
     pwm.setPWM(2, 0, pulselen); // command that moves the servo
-    delay(20);
+    delay(50);
   }
-  pwm.setPWM(2, 0, SERVOMIN);
+  pwm.setPWM(2, 0, BicepNewMin);
 }
+
+inline void Kill()
+{
+  delay(500);
+  
+  // BicepSwivel - Move from 90 degrees position to min position
+  int BicepNewMin = map(90, 0, 200, SERVOMIN, SERVOMAX);
+  pwm.setPWM(BicepSwivel, 0, BicepNewMin);
+  for (uint16_t pulselen = BicepNewMin; pulselen > 190; pulselen--) 
+  {
+    pwm.setPWM(BicepSwivel, 0, pulselen);
+    delay(10);
+  }
+  pwm.setPWM(BicepSwivel, 0, 190);
+  
+  delay(500);
+  
+  // Wrist - Move from 90 degrees position to max position
+  int WristNewMin = map(90, 0, 200, SG90MIN, SG90MAX);
+  pwm.setPWM(Wrist, 0, WristNewMin);
+  for (uint16_t pulselen = WristNewMin; pulselen < SG90MAX; pulselen++) 
+  {
+    pwm.setPWM(Wrist, 0, pulselen);
+    delay(10);
+  }
+  pwm.setPWM(Wrist, 0, SG90MAX);
+  
+  delay(500);
+  
+  // Elbow - Move from min position to max position
+  pwm.setPWM(Elbow, 0, SERVOMIN);
+  for (uint16_t pulselen = SERVOMIN; pulselen < SERVOMAX; pulselen++) 
+  {
+    pwm.setPWM(Elbow, 0, pulselen);
+    delay(10);
+  }
+  pwm.setPWM(Elbow, 0, SERVOMAX);
+  
+  delay(500);
+}
+
 
 inline void ONEWAYWristDegrees(int Degrees)
 {

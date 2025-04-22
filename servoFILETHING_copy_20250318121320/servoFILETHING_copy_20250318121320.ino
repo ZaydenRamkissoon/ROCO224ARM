@@ -73,7 +73,9 @@ void loop()
     // Initialize the arm to a known position
     SetMinPositions();
     pwm.setPWM(3, 0, 210);
-    delay(50000);
+    delay(5000);
+    Kill();
+    delay(5000);
     
     
     
