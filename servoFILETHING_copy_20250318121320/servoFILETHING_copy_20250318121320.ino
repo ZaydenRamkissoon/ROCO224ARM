@@ -52,6 +52,9 @@ void loop()
   if (newDataAvailable) 
   {
     moveServosToFace();
+    delay(5000);
+    //SummonPotOfGreed();
+    //I_SUMMON_POT_OF_GREED_TO_DRAW_3_ADDITIONAL_CARDS_FROM_MY_DECK();
     SetMinPositions(); // Reset to minimum positions after moving
     newDataAvailable = false;
   }
@@ -72,13 +75,17 @@ void loop()
     
     // Initialize the arm to a known position
     SetMinPositions();
+    
+    //PointToCoordinates(100, 200, 300);
+    //while(1);
     pwm.setPWM(3, 0, 210);
-    delay(5000);
+    delay(50);
     Kill();
-    delay(5000);
+    delay(100);
     
     
     
-    delay(1000); // Wait a second before checking again
+    
+    delay(100); // Wait 100 ms before checking again
   }  
 }
