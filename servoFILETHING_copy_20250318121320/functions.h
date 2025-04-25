@@ -18,6 +18,7 @@
 // Constants for the arm dimensions in cm
 #define BICEP_LENGTH 15.0     // Length of the bicep segment (15 cm)
 #define FOREARM_LENGTH 18.0   // Length of the forearm segment (18 cm)
+#define FIXED_BICEP_ANGLE 45
 
 // Position of the arm base (capstan drive) relative to the camera's coordinate system
 #define ARM_BASE_X 0.0  // X coordinate of arm base in camera space (adjust as needed)
@@ -74,18 +75,6 @@ void SummonPotOfGreed();
 void BeatAlbinsAss();
 void resetBadmintonPosition();
 void I_SUMMON_POT_OF_GREED_TO_DRAW_3_ADDITIONAL_CARDS_FROM_MY_DECK();
-
-
-
-// Define the fixed bicep angle (45 degrees downward)
-#define FIXED_BICEP_ANGLE 45
-
-// Improved SummonPotOfGreed function that correctly points a laser to the given coordinates
-// while accounting for the 45-degree downward tilt of the bicep
-// Improved SummonPotOfGreed function that correctly points a laser to the given coordinates
-// while accounting for the 45-degree downward tilt of the bicep
-// Using only bare for loops instead of higher-level functions
-
 
 
 inline void PointToCoordinates(float targetX, float targetY, float targetZ) {
