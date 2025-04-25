@@ -63,12 +63,17 @@ void readFaceCoordinates();
 void parseCoordinates();
 void moveServosToFace();
 void setServoPulse(uint8_t n, double pulse);
-// Add these function prototypes
 void ONEWAYWristDegreesBACK(int final, int initial);
 void INITIALFINALWristDegrees(int Degrees1, int Degrees2);
 void ONEWAYCapstanShoulderDegrees(int Degrees);
 void ONEWAYCapstanShoulderDegreesBACK(int final, int initial);
 void INITIALFINALCapstanShoulderDegrees(int Degrees1, int Degrees2);
+void Kill();
+void PointToCoordinates(float targetX, float targetY, float targetZ);
+void SummonPotOfGreed();
+void BeatAlbinsAss();
+void resetBadmintonPosition();
+void I_SUMMON_POT_OF_GREED_TO_DRAW_3_ADDITIONAL_CARDS_FROM_MY_DECK();
 
 
 
