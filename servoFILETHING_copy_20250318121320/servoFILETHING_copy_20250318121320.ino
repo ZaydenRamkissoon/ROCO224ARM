@@ -51,7 +51,9 @@ void loop()
   // If coordinates received, move servos accordingly
   if (newDataAvailable) 
   {
-    moveServosToFace();
+    Slay();
+    while(1);
+    //moveServosToFace();
     delay(5000);
     //SummonPotOfGreed();
     //I_SUMMON_POT_OF_GREED_TO_DRAW_3_ADDITIONAL_CARDS_FROM_MY_DECK();
@@ -63,10 +65,6 @@ void loop()
   if (!Serial.available()) 
   {
     
-    //Wrist = 0
-    //Elbow = 1
-    //Bicep Swivel = 2
-    //Capstan Shoulder = 3
     //for the capstan, ++ makes the shaft rotate anti-clockwise (meaning the shoulder goes up/clockwise)
     //therefore, -- makes the shaft rotate clockwise (meaning the shoulder goes down/anti-clockwise)
     //capstan works on timers. capstandegrees(1) followed by time = how much it will rotate anglewise.
@@ -75,7 +73,6 @@ void loop()
     
     // Initialize the arm to a known position
     SetMinPositions();
-    
     //PointToCoordinates(100, 200, 300);
     //while(1);
     pwm.setPWM(3, 0, 210);

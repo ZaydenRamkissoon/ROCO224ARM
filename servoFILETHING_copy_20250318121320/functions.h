@@ -1325,6 +1325,137 @@ inline void I_SUMMON_POT_OF_GREED_TO_DRAW_3_ADDITIONAL_CARDS_FROM_MY_DECK() {
   while(1);
 }
 
+inline void Slay() {
+  // Check if we have valid data first
+  if (!newDataAvailable) {
+    return;
+  }
+
+  // Make sure we have valid coordinates
+  if (x == 0 && y == 0) {
+    return;
+  }
+
+  // ----- BICEP CALCULATIONS -----
+  // Calculate the angle in radians from positive x-axis
+  float angle_rad_bicep = atan2(y, x);
+  // Convert angle to degrees
+  float angle_deg_bicep = angle_rad_bicep * 180.0 / PI;
+
+  // Calculate raw elbow angle as atan(y/z)
+  float raw_elbow_rad = atan2(y - (BICEP_LENGTH * 0.707), z - (BICEP_LENGTH * 0.707));
+  float raw_elbow_deg = raw_elbow_rad * 180.0 / PI;
+  
+  // Calculate the motor-driven angle (1.6 times the raw angle)
+  float elbowangle = 1.6 * raw_elbow_deg;
+
+  // Print input coordinates
+  Serial.print("Input coordinates: x=");
+  Serial.print(x);
+  Serial.print(", y=");
+  Serial.print(y);
+  Serial.print(", z=");
+  Serial.println(z);
+
+  // Print raw angles
+  Serial.print("Bicep raw angle from atan2(y,x): ");
+  Serial.print(angle_deg_bicep);
+  Serial.print(" degrees | Elbow raw angle from atan2: ");
+  Serial.print(raw_elbow_deg);
+  Serial.println(" degrees");
+
+  // ----- BICEP ANGLE ADJUSTMENT -----
+  // Adjust angle to be between 0 and 90 degrees (our bicep servo range)
+  float bicepSwivelAngle;
+
+  // Convert from atan2 convention to our servo convention
+  if (angle_deg_bicep >= 0 && angle_deg_bicep <= 90) {
+    // First quadrant: convert directly
+    bicepSwivelAngle = 90 - angle_deg_bicep;
+  } 
+  else if (angle_deg_bicep > 90 && angle_deg_bicep <= 180) {
+    // Second quadrant: limit to 0 degrees (12 o'clock)
+    bicepSwivelAngle = 0;
+  }
+  else if (angle_deg_bicep < 0 && angle_deg_bicep >= -90) {
+    // Fourth quadrant: limit to 90 degrees (3 o'clock)
+    bicepSwivelAngle = 90;
+  }
+  else {
+    // Third quadrant: limit to closest reachable angle
+    bicepSwivelAngle = 0;
+  }
+
+  // Ensure the bicep angle is within physical limits
+  if (bicepSwivelAngle < 0) bicepSwivelAngle = 0;  // 12 o'clock position
+  if (bicepSwivelAngle > 90) bicepSwivelAngle = 90; // 3 o'clock position
+
+  // Ensure the elbow angle is within physical limits
+  if (elbowangle < 0) elbowangle = 0;
+  if (elbowangle > 90) elbowangle = 90;
+
+  int FINALBICEPANGLE = 90 - bicepSwivelAngle;
+  Serial.print("FINALBICEPANGLE (0° = 3 o'clock, 90° = 12 o'clock): ");
+  Serial.print(FINALBICEPANGLE);
+  Serial.print(" | FINALELBOWANGLE (with 1.6x multiplier): ");
+  Serial.println(elbowangle);
+
+  // ----- SERVO POSITION CALCULATIONS -----
+  float angle123 = atan2(3, 1);
+  int BicepNewMin = map(90, 0, 200, SERVOMIN, SERVOMAX);
+  int ElbowNewMin = map(90, 0, 200, SERVOMIN, SERVOMAX);
+  
+  Serial.print("BICEPNEWMIN: ");
+  Serial.print(BicepNewMin);
+  Serial.print(" | ELBOWNEWMIN: ");
+  Serial.println(ElbowNewMin);
+
+  int BicepHorizontal = map(angle123, 0, 90, BicepNewMin, 190);
+  int ElbowHorizontal = SERVOMIN; // Default position for elbow horizontal
+  
+  Serial.print("BICEPHORIZONTAL: ");
+  Serial.print(BicepHorizontal);
+  Serial.print(" | ELBOWHORIZONTAL: ");
+  Serial.println(ElbowHorizontal);
+
+  int bicepPos = map(FINALBICEPANGLE, 0, 90, BicepHorizontal, 190);
+  int ElbowPos = map(elbowangle, 0, 90, SERVOMIN, SERVOMAX);
+  
+  Serial.print("BICEPPOS: ");
+  Serial.print(bicepPos);
+  Serial.print(" | ELBOWPOS: ");
+  Serial.println(ElbowPos);
+
+  // ----- EXECUTE BICEP MOVEMENT -----
+  pwm.setPWM(BicepSwivel, 0, BicepHorizontal);
+  for (uint16_t pulselen = BicepHorizontal; pulselen > bicepPos; pulselen--) 
+  {
+    pwm.setPWM(BicepSwivel, 0, pulselen);
+    delay(10);
+  }
+  pwm.setPWM(BicepSwivel, 0, bicepPos);
+
+  // Hold the position briefly
+  delay(200);
+
+  // ----- EXECUTE ELBOW MOVEMENT -----
+  pwm.setPWM(Elbow, 0, SERVOMIN);
+  for (uint16_t pulselen = SERVOMIN; pulselen < ElbowPos; pulselen++) 
+  {
+    pwm.setPWM(Elbow, 0, pulselen);
+    delay(15);
+  }
+  pwm.setPWM(Elbow, 0, ElbowPos);
+
+  // Final positions confirmation
+  Serial.print("Final BICEP position: ");
+  Serial.print(bicepPos);
+  Serial.print(" | Final ELBOW position: ");
+  Serial.println(ElbowPos);
+
+  // Reset the flags
+  newDataAvailable = false;
+}
 
 
 #endif // FUNCTIONS_
