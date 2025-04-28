@@ -1453,6 +1453,33 @@ inline void Slay() {
   Serial.print(" | Final ELBOW position: ");
   Serial.println(ElbowPos);
 
+    // Set wrist swivel to maintain vertical orientation (opposite of bicep angle)
+  int wristSwivelDegrees = -1 * FINALBICEPANGLE;
+
+  // Ensure wrist angle is within physical limits
+  if (wristSwivelDegrees < -90) wristSwivelDegrees = -90;
+  if (wristSwivelDegrees > 90) wristSwivelDegrees = 90;
+
+  // Calculate WristNewMin like in the SetMinPositions function
+  int WristNewMin = map(90, 0, 200, SG90MIN, SG90MAX);
+
+  // Map wrist angle to servo position relative to WristNewMin
+  int wristPos = map(wristSwivelDegrees + 90, 0, 180, WristNewMin, SG90MIN);
+
+  Serial.print("WRISTANGLE (vertical compensation): ");
+  Serial.print(wristSwivelDegrees);
+  Serial.print(" | WRISTPOS: ");
+  Serial.println(wristPos);
+
+  // Drive the wrist servo
+  pwm.setPWM(Wrist, 0, WristNewMin);
+  for (uint16_t pulselen = WristNewMin; pulselen < wristPos; pulselen++) 
+  {
+      pwm.setPWM(Wrist, 0, pulselen);
+      delay(10);
+  }
+  pwm.setPWM(Wrist, 0, wristPos);
+  
   // Reset the flags
   newDataAvailable = false;
 }
